@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
-import Popup from '../components/Popup/Popup';
+import { computed, h, onMounted, ref } from 'vue';
 import { useAppStore } from '../stores/appStore';
+import Button, { ButtonType } from '../components/Button/Button';
+import Popup from '../components/Popup/Popup';
+import Msgbox from '../components/Msgbox/Msgbox';
 import MenuCenter from './MenuCenter.vue';
+import IconPointOut from '../assets/warnings/pointOut.svg?component';
 
 const appStore = useAppStore();
 
@@ -54,7 +57,14 @@ const handleTopBarButtonClicked = (index: number) => {
 			appStore.showMenuCenter = 2;
 			appStore.selectedPanelIndex = 3;
 		} else {
-			window.open('./online', '_blank');
+			Msgbox({
+				image: h(IconPointOut),
+				title: '您将要使用一个尚未完善的网页版～',
+				content: h('div', ['4.0 版本尚未对网页运行进行针对性优化，因此网页版只能用于体验功能，可能无法正常使用', h('br'), '同时，建议自行部署以获得更佳体验～']),
+				buttons: [
+					{ text: `我已知悉，继续`, type: ButtonType.Primary, callback: () => window.open('./online', '__blank') && true },
+				]
+			});
 		}
 	} else if (index === 4) {
 		// 下载

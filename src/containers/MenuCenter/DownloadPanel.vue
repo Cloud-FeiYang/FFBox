@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { h } from 'vue';
 import { useAppStore } from '../../stores/appStore';
 import Button, { ButtonType } from '../../components/Button/Button';
 import Popup from '../../components/Popup/Popup';
+import Msgbox from '../../components/Msgbox/Msgbox';
 import IconNodejs from '../../assets/menuCenter/downloadPanel/nodejs.svg?component';
 import IconMsi from '../../assets/menuCenter/downloadPanel/msi.svg?component';
 import IconApp from '../../assets/menuCenter/downloadPanel/app.svg?component';
 import IconWeb from '../../assets/menuCenter/downloadPanel/web.svg?component';
 import IconZip from '../../assets/menuCenter/downloadPanel/zip.svg?component';
+import IconPointOut from '../../assets/warnings/pointOut.svg?component';
 
 const appStore = useAppStore();
 
@@ -49,7 +51,18 @@ const handleDownloadClick = (os: 'Windows' | 'MacOS' | 'Linux' | 'web', selectio
 				'./online',
 				'./FFBox_v4.0_web.zip',
 			][selection];
-			window.open(url, '__blank');
+			if (selection === 0) {
+				Msgbox({
+					image: h(IconPointOut),
+					title: '您将要使用一个尚未完善的网页版～',
+					content: h('div', ['4.0 版本尚未对网页运行进行针对性优化，因此网页版只能用于体验功能，可能无法正常使用', h('br'), '同时，建议自行部署以获得更佳体验～']),
+					buttons: [
+						{ text: `我已知悉，继续`, type: ButtonType.Primary, callback: () => window.open(url, '__blank') && true },
+					]
+				});
+			} else {
+				window.open(url, '__blank');
+			}
 			break;
 		default:
 			break;
