@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import Popup from '../components/Popup/Popup';
 import { useAppStore } from '../stores/appStore';
 import MenuCenter from './MenuCenter.vue';
 
@@ -34,21 +35,39 @@ const firstScreenStyle = computed(() => {
 
 const handleTopBarButtonClicked = (index: number) => {
 	if (index === 0) {
+		// 更新说明
 		appStore.showMenuCenter = 2;
 		appStore.selectedPanelIndex = 0;
 	} else if (index === 1) {
+		// 开发日志
 		window.open('https://github.com/ttqftech/FFBox/blob/4.0%2B/日志.md', '_blank');
 	} else if (index === 2) {
+		// 使用条款
 		appStore.showMenuCenter = 2;
 		appStore.selectedPanelIndex = 3;
 	} else if (index === 3) {
+		// 网页版
+		if (!appStore.termsAgreed) {
+			Popup({
+				message: '请先同意条款后再使用～',
+			});
+			appStore.showMenuCenter = 2;
+			appStore.selectedPanelIndex = 3;
+		} else {
+			window.open('./online', '_blank');
+		}
+	} else if (index === 4) {
+		// 下载
 		appStore.showMenuCenter = 2;
 		appStore.selectedPanelIndex = 1;
 		showBigDownloadButton.value = false;
 	}
 };
 
-onMounted(() => {
+onMounted(async () => {
+	const sleep = (ms: number) => new Promise((r) => setTimeout(() => r, ms));
+
+	// 窗口大小变更监听
 	const listener = () => {
 		if (document.body.clientWidth < 1080) {
 			FFBoxZoomValue.value = document.body.clientWidth / 1080;
@@ -59,6 +78,20 @@ onMounted(() => {
 	}
 	listener();
 	window.addEventListener('resize', listener);
+
+	// 浏览器检查
+	if (navigator.userAgent.includes('Firefox')) {
+		Popup({ message: 'Firefox 浏览器在浏览本页的时候，可能会出现部分元素缩放不正常的现象' });
+		sleep(1);
+		Popup({ message: '如影响到浏览，烦请更换 Chromium 内核的浏览器～' });
+	}
+	let zoomValue = 1;
+	if (document.body.clientWidth < 1080) {
+		zoomValue = document.body.clientWidth / 1080;
+	}
+	if (window.innerHeight < 720 * zoomValue + 40) {
+		Popup({ message: '您的浏览器窗口高度较小，可能无法正确排版，请减小缩放以正确显示页面～' });
+	}
 })
 
 </script>
@@ -66,7 +99,7 @@ onMounted(() => {
 <template>
 	<div class="mainFrame" :data-color_theme="appStore.colorTheme">
 		<div class="topBar lrMargin">
-			<a class="nav" style="float: left;" href="http://ttqf.tech/" title="滔滔清风科技馆主页">
+			<a class="nav" style="float: left;" href="http://www.ttqf.tech/" title="滔滔清风科技馆主页">
 				<div class="ttqftechlogo"></div>
 			</a>
 			<a class="nav" style="float: right;" href="https://github.com/ttqftech/FFBox/" target="_blank" title="FFBox GitHub 主页">
@@ -92,7 +125,8 @@ onMounted(() => {
 					<img v-if="appStore.colorTheme === 'themeLight'" src="../assets/软件截图_浅色.png" />
 					<img v-if="appStore.colorTheme === 'themeDark'" src="../assets/软件截图_深色.png" />
 					<div class="FFBox">
-						<button @click="handleTopBarButtonClicked(3)" class="startbutton startbutton-green">⬇️下载</button>
+						<button @click="handleTopBarButtonClicked(3)" class="startbutton startbutton2 startbutton-cyan">🌐网页版</button>
+						<button @click="handleTopBarButtonClicked(4)" class="startbutton startbutton1 startbutton-green">⬇️下载</button>
 						<MenuCenter />
 					</div>
 				</div>
@@ -305,6 +339,7 @@ onMounted(() => {
 		// height: calc(100vh + 64px);
 		max-height: 1280px;
 		overflow: hidden;
+		isolation: isolate;
 		.lrCenter {
 			text-align: center;
 			.title-1 {
@@ -376,7 +411,6 @@ onMounted(() => {
 					.startbutton {
 						position: absolute;
 						top: 46px;
-						right: 16px;
 						width: 120px;
 						height: 36px;
 						text-align: center;
@@ -399,6 +433,13 @@ onMounted(() => {
 							border-radius: 10px;
 							background: -webkit-linear-gradient(-90deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0));
 						}
+					}
+					.startbutton1 {
+						right: 16px;
+					}
+					.startbutton2 {
+						right: 160px;
+						width: 140px;
 					}
 				}
 			}
@@ -514,33 +555,63 @@ onMounted(() => {
 						0px 1px 1px 0px rgba(16, 16, 16, 0.15),	// 按钮厚度
 						0px 2px 6px 0px rgba(0, 0, 0, 0.1),	// 按钮阴影
 						0px 4px 16px -4px hwb(120 40% 10%);	// 按钮发光和远距阴影
+			&:active {
+				background: linear-gradient(180deg, hwb(120 10% 40%), hwb(120 20% 20%));
+			}
+			&:hover {
+				box-shadow: 0px -1px 1px 0px rgba(255, 255, 255, 0.3),
+							0px 1px 1px 0px rgba(16, 16, 16, 0.15),
+							0px 2px 6px 0px rgba(0, 0, 0, 0.1),
+							0px 4px 24px 0px hwb(120 40% 10%);
+			}
 		}
-		.startbutton-green:active {
-			background: linear-gradient(180deg, hwb(120 10% 40%), hwb(120 20% 20%));
-		}
-		.startbutton-green:hover {
-			box-shadow: 0px -1px 1px 0px rgba(255, 255, 255, 0.3),
-						0px 1px 1px 0px rgba(16, 16, 16, 0.15),
-						0px 2px 6px 0px rgba(0, 0, 0, 0.1),
-						0px 4px 24px 0px hwb(120 40% 10%);
+		.startbutton-cyan {
+			background: linear-gradient(180deg, hwb(180 20% 15%), hwb(180 10% 30%));
+			box-shadow: 0px -1px 1px 0px rgba(255, 255, 255, 0.3),	// 去除上方阴影
+						0px 1px 1px 0px rgba(16, 16, 16, 0.15),	// 按钮厚度
+						0px 2px 6px 0px rgba(0, 0, 0, 0.1),	// 按钮阴影
+						0px 4px 16px -4px hwb(180 20% 15%);	// 按钮发光和远距阴影
+			&:active {
+				background: linear-gradient(180deg, hwb(180 10% 40%), hwb(180 10% 30%));
+			}
+			&:hover {
+				box-shadow: 0px -1px 1px 0px rgba(255, 255, 255, 0.3),
+							0px 1px 1px 0px rgba(16, 16, 16, 0.15),
+							0px 2px 6px 0px rgba(0, 0, 0, 0.1),
+							0px 4px 24px 0px hwb(180 40% 10%);
+			}
 		}
 	}
 	.mainFrame[data-color_theme="themeDark"] {
 		.startbutton-green {
 			background: linear-gradient(180deg, hwb(120 20% 10%), hwb(120 10% 30%));
-			box-shadow: 0px -1px 1px 0px rgba(255, 255, 255, 0.3),	// 去除上方阴影
-						0px 1px 1px 0px rgba(16, 16, 16, 0.15),	// 按钮厚度
+			box-shadow: 0px 1px 1px 0px rgba(16, 16, 16, 0.15),	// 按钮厚度
 						0px 2px 6px 0px rgba(0, 0, 0, 0.1),	// 按钮阴影
 						0px 4px 16px -4px hwb(120 40% 10%);	// 按钮发光和远距阴影
+			&:active {
+				background: linear-gradient(180deg, hwb(120 5% 50%), hwb(120 10% 30%));
+			}
+			&:hover {
+				box-shadow: 0px -1px 1px 0px rgba(255, 255, 255, 0.3),
+							0px 1px 1px 0px rgba(16, 16, 16, 0.15),
+							0px 2px 6px 0px rgba(0, 0, 0, 0.1),
+							0px 4px 24px 0px hwb(120 20% 10%);
+			}
 		}
-		.startbutton-green:active {
-			background: linear-gradient(180deg, hwb(120 5% 50%), hwb(120 10% 30%));
-		}
-		.startbutton-green:hover {
-			box-shadow: 0px -1px 1px 0px rgba(255, 255, 255, 0.3),
-						0px 1px 1px 0px rgba(16, 16, 16, 0.15),
-						0px 2px 6px 0px rgba(0, 0, 0, 0.1),
-						0px 4px 24px 0px hwb(120 20% 10%);
+		.startbutton-cyan {
+			background: linear-gradient(180deg, hwb(180 15% 10%), hwb(180 10% 35%));
+			box-shadow: 0px 1px 1px 0px rgba(16, 16, 16, 0.15),	// 按钮厚度
+						0px 2px 6px 0px rgba(0, 0, 0, 0.1),	// 按钮阴影
+						0px 4px 16px -4px hwb(180 40% 10%);	// 按钮发光和远距阴影
+			&:active {
+				background: linear-gradient(180deg, hwb(180 5% 50%), hwb(180 10% 35%));
+			}
+			&:hover {
+				box-shadow: 0px -1px 1px 0px rgba(255, 255, 255, 0.3),
+							0px 1px 1px 0px rgba(16, 16, 16, 0.15),
+							0px 2px 6px 0px rgba(0, 0, 0, 0.1),
+							0px 4px 24px 0px hwb(180 15% 10%);
+			}
 		}
 	}
 
