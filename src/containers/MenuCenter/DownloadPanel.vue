@@ -25,37 +25,36 @@ const handleDownloadClick = (os: 'Windows' | 'MacOS' | 'Linux' | 'web', selectio
 	switch (os) {
 		case 'Windows':
 			url = [
-				'https://github.com/ttqftech/FFBox/releases/download/v4.0/Windows_x86-64_FFBox_4.0.msi',
-				'https://github.com/ttqftech/FFBox/releases/download/v4.0/Windows_x86-64_FFBoxService_4.0.exe',
+				'https://github.com/ttqftech/FFBox/releases/download/v4.1/Windows_x86-64_FFBox_4.1.msi',
+				'https://github.com/ttqftech/FFBox/releases/download/v4.1/Windows_x86-64_FFBoxService_4.1.exe',
 			][selection];
 			window.open(url, '__blank');
 			break;
 		case 'MacOS':
 			url = [
-				'https://github.com/ttqftech/FFBox/releases/download/v4.0/macOS_ARM64_FFBox_4.0.dmg',
-				'https://github.com/ttqftech/FFBox/releases/download/v4.0/macOS_ARM64_FFBox_4.0.app.zip',
-				'https://github.com/ttqftech/FFBox/releases/download/v4.0/macOS_ARM64_FFBoxService_4.0',
+				'https://github.com/ttqftech/FFBox/releases/download/v4.1/macOS_ARM64_FFBox_4.1.dmg',
+				'https://github.com/ttqftech/FFBox/releases/download/v4.1/macOS_ARM64_FFBoxService_4.1',
 			][selection];
 			window.open(url, '__blank');
 			break;
 		case 'Linux':
 			url = [
-				'https://github.com/ttqftech/FFBox/releases/download/v4.0/Linux_x86-64_FFBox_4.0.deb',
-				'https://github.com/ttqftech/FFBox/releases/download/v4.0/Linux_x86-64_FFBox_4.0.AppImage',
-				'https://github.com/ttqftech/FFBox/releases/download/v4.0/Linux_x86-64_FFBoxService_4.0',
+				'https://github.com/ttqftech/FFBox/releases/download/v4.1/Linux_x86-64_FFBox_4.1.deb',
+				'https://github.com/ttqftech/FFBox/releases/download/v4.1/Linux_x86-64_FFBox_4.1.AppImage',
+				'https://github.com/ttqftech/FFBox/releases/download/v4.1/Linux_x86-64_FFBoxService_4.1',
 			][selection];
 			window.open(url, '__blank');
 			break;
 		case 'web':
 			url = [
 				'./online',
-				'./FFBox_v4.0_web.zip',
+				'./FFBox_v4.1_web.zip',
 			][selection];
 			if (selection === 0) {
 				Msgbox({
 					image: h(IconPointOut),
 					title: '您将要使用一个尚未完善的网页版～',
-					content: h('div', ['4.0 版本尚未对网页运行进行针对性优化，因此网页版只能用于体验功能，可能无法正常使用', h('br'), '同时，建议自行部署以获得更佳体验～']),
+					content: h('div', ['4.1 版本尚未对网页运行进行针对性优化，因此网页版只能用于体验功能，可能无法正常使用', h('br'), '同时，建议自行部署以获得更佳体验～']),
 					buttons: [
 						{ text: `我已知悉，继续`, type: ButtonType.Primary, callback: () => window.open(url, '__blank') && true },
 					]
@@ -81,8 +80,8 @@ const handleDownloadClick = (os: 'Windows' | 'MacOS' | 'Linux' | 'web', selectio
 		<Button size="large" @click="handleDownloadClick('Linux', 1)"><IconApp />AppImage 便携程式</Button>
 		<Button size="large" @click="handleDownloadClick('Linux', 2)"><IconNodejs />转码服务</Button>
 		<h2>MacOS<span>(ARM64)</span></h2>
-		<Button size="large" @click="handleDownloadClick('MacOS', 1)"><IconApp />app 应用程式</Button>
-		<Button size="large" @click="handleDownloadClick('MacOS', 2)"><IconNodejs />转码服务</Button>
+		<Button size="large" @click="handleDownloadClick('MacOS', 0)"><IconApp />app 应用程式</Button>
+		<Button size="large" @click="handleDownloadClick('MacOS', 1)"><IconNodejs />转码服务</Button>
 		<h2>网页<span>(不提供转码服务)</span></h2>
 		<Button size="large" @click="handleDownloadClick('web', 0)"><IconWeb />在线使用</Button>
 		<Button size="large" @click="handleDownloadClick('web', 1)"><IconZip />zip 自行部署</Button>

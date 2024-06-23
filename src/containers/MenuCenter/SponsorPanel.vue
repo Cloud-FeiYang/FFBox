@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, useCssModule } from 'vue';
 import Button, { ButtonType } from '../../components/Button/Button';
+import Tooltip from '../../components/Tooltip/Tooltip';
 import IconGithub from '../../assets/menuCenter/sponsorCenter/github.svg?component';
 import IconGitee from '../../assets/menuCenter/sponsorCenter/gitee.svg?component';
 import IconKoFi from '../../assets/menuCenter/sponsorCenter/ko-fi.svg?component';
+import IconAfdian from '../../assets/menuCenter/sponsorCenter/afdian.png';
 import ImageAlipay from '../../assets/menuCenter/sponsorCenter/alipay.png';
 import ImageWechatpay from '../../assets/menuCenter/sponsorCenter/wechatpay.svg?url';
 import ImageQQpay from '../../assets/menuCenter/sponsorCenter/qqpay.png';
+
+const style = useCssModule();
 
 const qr_alipayredenvelop = ref<HTMLCanvasElement>();
 const qr_alipay = ref<HTMLCanvasElement>();
@@ -16,6 +20,7 @@ const qr_qqpay = ref<HTMLCanvasElement>();
 const jumpToGithub = () => window.open('https://github.com/ttqftech/FFBox', '_blank');
 const jumpToGitee = () => window.open('https://gitee.com/ttqf/FFBox', '_blank');
 const jumpToKoFi = () => window.open('https://ko-fi.com/N4N26F2WR', '_blank');
+const jumpToAfdian = () => window.open('https://afdian.net/a/ttqftech');
 
 // 传入 HexEditor 从第一个像素开始的内容，需要 4 位灰度色 bmp，反向行序
 // 传入二维码大小
@@ -68,6 +73,12 @@ const paintQRcode2canvas = (canvas: HTMLCanvasElement, QRcode: string[][]) => {
 	}
 };
 
+const handleElementHover = (e: MouseEvent, content: string) => {
+	const rect = (e.target as any).getBoundingClientRect();
+	Tooltip.show({ content: content, style: { top: `${rect.top + rect.height}px`, right: `${window.innerWidth - rect.right}px` }, class: style.smallTip });
+	// Tooltip.show({ content: content, style: { top: `${e.pageY}px`, right: `${window.innerWidth - e.pageX}px` }, class: style.smallTip });
+};
+
 onMounted(() => {
 	paintQRcode2canvas(qr_alipayredenvelop.value, alipayRedEnvelopQR());
 	paintQRcode2canvas(qr_alipay.value, alipayQR());
@@ -82,12 +93,21 @@ onMounted(() => {
 		<p>开发者想要你来 GitHub / Gitee 点个星～</p>
 		<p>（或者提点建议也行，比如如何让下面这些花花绿绿的二维码没那么丑🤪</p>
 		<div class="paragram">
-			<Button @click="jumpToGithub"><IconGithub />GitHub</Button>
-			<Button @click="jumpToGitee"><IconGitee />Gitee</Button>
+			<Button @click="jumpToGithub" @mouseleave="Tooltip.hide()" @mouseenter="handleElementHover($event, '如果你打不开，那就努力再尝试！反复尝试！尝试到国家都为你而感动！')">
+				<IconGithub />GitHub
+			</Button>
+			<Button @click="jumpToGitee" @mouseleave="Tooltip.hide()" @mouseenter="handleElementHover($event, '这个是备用哒～')">
+				<IconGitee />Gitee
+			</Button>
 		</div>
-		<p>下面这个按钮就不是免费的，除非你想请我喝奶茶🧋</p>
+		<p>如果你不只是想给我送⭐，还想送我奶茶🧋，那么可以点下面两个按钮～</p>
 		<div class="paragram">
-			<Button @click="jumpToKoFi"><IconKoFi />Ko-Fi</Button>
+			<Button @click="jumpToKoFi" @mouseleave="Tooltip.hide()" @mouseenter="handleElementHover($event, '一直都没人点这个，我是不是该考虑把它撤了🤔')">
+				<IconKoFi />Ko-Fi
+			</Button>
+			<Button @click="jumpToAfdian" @mouseleave="Tooltip.hide()" @mouseenter="handleElementHover($event, '这个似乎更适合中国宝宝的体质❤️～')">
+				<img :src="IconAfdian" />爱发电
+			</Button>
 		</div>
 		<p>🍲赛博红包来咯~</p>
 		<div class="paragram">
@@ -106,7 +126,7 @@ onMounted(() => {
 		</div>
 		<p>如果还想把我喂胖，扫下面几个🐴也行 _(:з」∠)_（只要你喜欢</p>
 		<div class="paragram">
-			<div class="QRscreen QRscreen-alipay">
+			<div class="QRscreen QRscreen-alipay" @mouseleave="Tooltip.hide()" @mouseenter="handleElementHover($event, '（你有没有发现，我把支付宝跟微信支付的标语互换了👀')">
 				<div class="QRuppertext">推荐使用<strong>支付宝</strong></div>
 				<div class="QRbox">
 					<canvas ref="qr_alipay"></canvas>
@@ -116,7 +136,7 @@ onMounted(() => {
 					<img :src="ImageAlipay">
 				</div>
 			</div>
-			<div class="QRscreen QRscreen-wechatpay">
+			<div class="QRscreen QRscreen-wechatpay" @mouseleave="Tooltip.hide()" @mouseenter="handleElementHover($event, '（你有没有发现，我把支付宝跟微信支付的标语互换了👀')">
 				<div class="QRuppertext">支付就用微信支付</div>
 				<div class="QRbox">
 					<canvas ref="qr_wechatpay"></canvas>
@@ -126,7 +146,7 @@ onMounted(() => {
 					<img :src="ImageWechatpay">
 				</div>
 			</div>
-			<div class="QRscreen QRscreen-qqpay">
+			<div class="QRscreen QRscreen-qqpay" @mouseleave="Tooltip.hide()" @mouseenter="handleElementHover($event, '听说好多人不用 QQ 支付的原因是要实名？🤔')">
 				<div class="QRuppertext">QQ 支付</div>
 				<div class="QRbox">
 					<canvas ref="qr_qqpay"></canvas>
@@ -147,7 +167,7 @@ onMounted(() => {
 		flex-wrap: wrap;
 		margin-bottom: 24px;
 		&>button {
-			svg {
+			svg, img {
 				width: 20px;
 				height: 20px;
 				vertical-align: -4px;
@@ -239,5 +259,26 @@ onMounted(() => {
 		font-size: 20px;
 		margin: 2em 0 1em;
 		color: var(--titleText);
+	}
+</style>
+
+<style module lang="less">
+	.smallTip {
+		:global .tooltip-box {
+			position: relative;
+			top: -1px;
+			padding: 6px 10px;
+			border-radius: 8px;
+			border: none;
+			background-color: hwb(var(--hoverLightBg) / 0.5);
+			backdrop-filter: blur(8px) contrast(110%);
+			box-shadow: 0 0 1px 0.5px hwb(var(--hoverLightBg)),
+						0 1.5px 4px 0 hwb(var(--hoverShadow) / 0.2),
+						0 1px 0.5px 0px hwb(var(--highlight) / 0.5) inset;	// 上高光
+			.tooltip-message {
+				font-size: 12px;
+				line-height: 16px;
+			}
+		}
 	}
 </style>

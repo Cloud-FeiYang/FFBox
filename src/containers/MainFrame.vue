@@ -60,7 +60,7 @@ const handleTopBarButtonClicked = (index: number) => {
 			Msgbox({
 				image: h(IconPointOut),
 				title: '您将要使用一个尚未完善的网页版～',
-				content: h('div', ['4.0 版本尚未对网页运行进行针对性优化，因此网页版只能用于体验功能，可能无法正常使用', h('br'), '同时，建议自行部署以获得更佳体验～']),
+				content: h('div', ['4.1 版本尚未对网页运行进行针对性优化，因此网页版只能用于体验功能，可能无法正常使用', h('br'), '同时，建议自行部署以获得更佳体验～']),
 				buttons: [
 					{ text: `我已知悉，继续`, type: ButtonType.Primary, callback: () => window.open('./online', '__blank') && true },
 				]
