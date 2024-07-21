@@ -2,3 +2,4 @@ node_modules
 app
 release
 *.log
+WindowsInstaller/output

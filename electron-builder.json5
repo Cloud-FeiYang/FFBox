@@ -75,10 +75,5 @@
       },
     ],
   },
-  "nsis": {
-    "oneClick": false,
-    "perMachine": false,
-    "allowToChangeInstallationDirectory": true,
-    "deleteAppDataOnUninstall": false
-  }
+  "afterAllArtifactBuild": "./scripts/postPackage-Windows.cjs",
 }
