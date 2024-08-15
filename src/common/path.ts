@@ -1,4 +1,4 @@
-import path, { basename, dirname } from 'path-browserify';
+import path, { basename, dirname, parse } from 'path-browserify';
 
 const isValidExt = function (ext: string, ignoreExts: any, maxSize: number) {
 	if (ignoreExts == null) {
@@ -10,18 +10,19 @@ const isValidExt = function (ext: string, ignoreExts: any, maxSize: number) {
 };
 
 export default {
-    trimExt(filename: string, ignoreExts?: any, maxSize?: number) {
-        var oldExt;
-        if (maxSize == null) {
-            maxSize = 7;
-        }
-        oldExt = path.extname(filename);
-        if (isValidExt(oldExt, ignoreExts, maxSize)) {
-          return filename.slice(0, +(filename.length - oldExt.length - 1) + 1 || 9000000000);
-        } else {
-          return filename;
-        }
-    },
-    basename,
-    dirname,
+	trimExt(filename: string, ignoreExts?: any, maxSize?: number) {
+		var oldExt;
+		if (maxSize == null) {
+			maxSize = 7;
+		}
+		oldExt = path.extname(filename);
+		if (isValidExt(oldExt, ignoreExts, maxSize)) {
+			return filename.slice(0, +(filename.length - oldExt.length - 1) + 1 || 9000000000);
+		} else {
+			return filename;
+		}
+	},
+	basename,
+	dirname,
+	parse,
 }

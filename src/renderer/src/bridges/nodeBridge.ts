@@ -1,6 +1,7 @@
 // import _ElectronStore from 'electron-store';
 import { IpcRenderer } from 'electron';
 import { ChildProcess } from 'child_process';
+import parsePath from 'parse-path';
 import { getEnv } from '@common/utils';
 
 // let ElectronStore: typeof _ElectronStore, electronStore: _ElectronStore;
@@ -192,6 +193,43 @@ export default {
 		} else {
 			window.open(url);
 		}
+	},
+
+	/** 将包含多行路径的字符串归类为本地文件、本地目录、远程文件的数量统计，及每行的类型。若为 electron 环境则自动展开子目录，若为浏览器环境则将全部本地路径归类为本地文件 */
+	getPathsCategorized(value: string): Promise<{ localFilesCount: number, localDirsCount: number, remotesCount: number, unknownsCount: number, lineResults: ('lf' | 'ld' | 'r' | 'u')[] }> {
+		if (window.jsb) {
+			return window.jsb?.ipcRenderer.invoke('getPathsCategorized', value);
+		} else {
+			const paths = value.split('\n').filter((line) => line !== '');
+			// const [localFiles, localDirs, remotes, unknowns] = [[], [], [], []] as string[][];
+			let [localFilesCount, localDirsCount, remotesCount, unknownsCount] = [0, 0, 0, 0];
+			const lineResults: ('lf' | 'ld' | 'r' | 'u')[] = [];
+			for (const path of paths) {
+				const fixedPath = path.startsWith('\\\\') ? 'file://' + path.slice(2) : path;	// 由于 node 的 URL 在解析 Windows 网络共享路径时会出错，故手动修一下
+				const result = parsePath(fixedPath);
+				if (result.parse_failed) {
+					// unknowns.push(path);
+					unknownsCount++;
+					lineResults.push('u');
+				} else if (result.host) {
+					// remotes.push(path);
+					remotesCount++;
+					lineResults.push('r');
+				} else {
+					localFilesCount++;
+					lineResults.push('lf');
+				}
+			}
+			return Promise.resolve({ localFilesCount, localDirsCount, remotesCount, unknownsCount, lineResults });
+		}
+	},
+
+	getLocalFile(url: string, limitSize: number): Promise<{ size: 0, file: Buffer }> {
+		return window.jsb?.ipcRenderer.invoke('getLocalFile', url, limitSize);
+	},
+
+	listItemsInDirectory(path: string, options?: { mode?: 'getFiles' | 'getDirectories', recursive?: boolean, fullPath?: boolean }): Promise<string[]> {
+		return window.jsb?.ipcRenderer.invoke('listItemsInDirectory', { path, ...options });
 	},
 
 	flashFrame(value = true): void {

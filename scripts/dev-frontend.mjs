@@ -83,7 +83,7 @@ function watchMain(server) {
 				electronProcess.kill()
 			}
 
-			electronProcess = spawn(electron, ['.'], { env })
+			electronProcess = spawn(electron, ['.', '--inspect=9229'], { env })
 			electronProcess.once('exit', process.exit)
 			// https://github.com/electron-vite/electron-vite-vue/pull/129
 			electronProcess.stdout.on('data', (data) => {

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { TaskStatus, WorkingStatus } from '@common/types';
+import { version } from '@common/constants';
 import { useAppStore } from '@renderer/stores/appStore';
 import { ServiceBridgeStatus } from '@renderer/bridges/serviceBridge';
 import showMenu, { MenuItem } from '@renderer/components/Menu/Menu';
 import nodeBridge from '@renderer/bridges/nodeBridge';
 import { showEnvironmentInfo } from '@renderer/components/misc/EnvironmentInfo'
+import { showAddTaskPrompt, showOpenFilePrompt } from '@renderer/components/misc/AddTasks';
 import SponsorPanel from './MenuCenter/SponsorPanel.vue';
 import LocalSettings from './MenuCenter/LocalSettings.vue';
 import Terms from './MenuCenter/Terms.vue';
@@ -47,7 +49,7 @@ const finalMenu = computed(() => {
 					{ type: 'normal', label: 'gitee 仓库', value: 'gitee 仓库', onClick: () => nodeBridge.jumpToUrl('https://gitee.com/ttqf/FFBox') },
 				] },
 				{ type: 'separator' },
-				{ type: 'normal', label: 'FFBox v4.0', value: 'FFBox', tooltip: '显示环境信息', onClick: () => showEnvironmentInfo() },
+				{ type: 'normal', label: `FFBox v${version}`, value: 'FFBox', tooltip: '显示环境信息', onClick: () => showEnvironmentInfo() },
 			],
 		},
 		{
@@ -80,18 +82,11 @@ const finalMenu = computed(() => {
 			type: 'submenu',
 			label: '任务 (T)',
 			subMenu: appStore.currentServer?.entity.status === ServiceBridgeStatus.Connected ? [
-				{ type: 'normal', label: '添加任务', value: '添加任务', tooltip: '向当前服务器添加任务', onClick: () => {
-					const elem = document.createElement('input');
-					elem.type = 'file';
-					elem.multiple = true;
-					document.body.appendChild(elem);
-					// elem.click();
-					const ev = new MouseEvent('click');
-					elem.dispatchEvent(ev);
-					document.body.removeChild(elem);
-					elem.onchange = () => {
-						appStore.addTasks(elem.files);
-					}
+				{ type: 'normal', label: '添加任务（选择文件）', value: '添加任务', tooltip: '打开文件选择器，向当前服务器添加任务', onClick: () => {
+					showOpenFilePrompt().then((fileList) => appStore.addTasks(fileList));
+				} },
+				{ type: 'normal', label: '添加任务（从文本）', value: '添加任务（从路径文本）', tooltip: '通过输入以行分割的路径文本，向当前服务器添加任务', onClick: () => {
+					showAddTaskPrompt();
 				} },
 				{ type: 'normal', label: '停止所有任务', value: '停止所有任务', tooltip: '将当前服务器所有运行中、已暂停的任务进行软停止操作', onClick: () => {
 					for (const [id, task] of Object.entries(appStore.currentServer?.data.tasks) || []) {

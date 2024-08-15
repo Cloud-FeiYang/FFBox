@@ -2,8 +2,9 @@
 import { computed, ref } from 'vue';
 import nodeBridge from '@renderer/bridges/nodeBridge';
 import { useAppStore } from '@renderer/stores/appStore';
-import Popup from '@renderer/components/Popup/Popup';
 import { NotificationLevel } from '@common/types';
+import { showAddTaskPrompt, showOpenFilePrompt } from '@renderer/components/misc/AddTasks';
+import Popup from '@renderer/components/Popup/Popup';
 import { TaskItem } from './ListArea/TaskItem';
 import IconNoffmpeg from '@renderer/assets/mainArea/noffmpeg.svg?component';
 
@@ -41,7 +42,10 @@ const debugLauncher = (() => {
 	let clickSpeedCounter = 0;
 	let clickSpeedTimer = 0;
 	let clickSpeedTimerStatus = false;
-	return function () {
+	return function (event: MouseEvent) {
+		if (event.button !== 2) {
+			return;
+		}
 		clickSpeedCounter += 20;
 		if (clickSpeedCounter > 100) {
 			Popup({
@@ -115,10 +119,19 @@ const onDragleave = (event: DragEvent) => {
 	event.preventDefault();
 	dragging.value = false;
 };
-const onDrop = (event: DragEvent) => {	// 此函数触发四次 taskList update，分别为加入任务、ffmpeg data、ffmpeg metadata、selectedTask update？
+/**
+ * 此函数触发四次 taskList update，分别为加入任务、ffmpeg data、ffmpeg metadata、selectedTask update（不知道现在还是不是这样）
+ * 目前仅处理“分别处理”模式的输入，待后期支持“拼接”之后再判断 drop 的是哪个
+ * @param event 
+ */
+const onDrop = (event: DragEvent) => {	// 
 	event.preventDefault();
 	dragging.value = false;
-	appStore.addTasks(event.dataTransfer?.files);
+	if (event.dataTransfer?.files?.length) {
+		appStore.addTasks(event.dataTransfer?.files);
+	} else if (event.dataTransfer?.items) {
+		showAddTaskPrompt(event.dataTransfer?.getData('text/plain'));
+	}
 };
 
 </script>
@@ -137,8 +150,14 @@ const onDrop = (event: DragEvent) => {	// 此函数触发四次 taskList update�
 				@pause-or-remove="appStore.pauseNremove(task.id)"
 			/>
 		</div>
-		<div v-if="hasFFmpeg" class="dropfilesdiv" @click="appStore.selectedTask = new Set()">
-			<div class="dropfilesimage" @click="debugLauncher" :class="dragging ? 'imgDragging' : 'imgNormal'" />
+		<div
+			v-if="hasFFmpeg"
+			class="dropfilesdiv"
+			@click="appStore.selectedTask = new Set()"
+			@mousedown="debugLauncher($event)"
+			@dblclick="nodeBridge.env === 'electron' ? showAddTaskPrompt() : showOpenFilePrompt().then((fileList) => appStore.addTasks(fileList))"
+		>
+			<div class="dropfilesimage" :class="dragging ? 'imgDragging' : 'imgNormal'" />
 		</div>
 		<div v-else class="noffmpeg">
 			<div class="box">
@@ -188,10 +207,10 @@ const onDrop = (event: DragEvent) => {	// 此函数触发四次 taskList update�
 				height: 100%;
 			}
 			.imgNormal {
-				background-image: url(/src/assets/mainArea/drop_files.png);
+				background-image: url(/src/assets/mainArea/drop_files.svg);
 			}
 			.imgDragging {
-				background-image: url(/src/assets/mainArea/drop_files_ok.png);
+				background-image: url(/src/assets/mainArea/drop_files_ok.svg);
 			}
 		}
 		.noffmpeg {

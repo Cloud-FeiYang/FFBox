@@ -111,50 +111,59 @@ export const useAppStore = defineStore('app', {
 		// #endregion 纯 UI
 		// #region 任务处理
 		/**
-		 * 添加一系列任务，来自 TaskView.onDrop
+		 * 添加一系列任务。仅支持本地文件和远程路径，本地文件夹需展开后再传入，未知路径传入无效
 		 */
-		addTasks (files: FileList) {
-			function checkAndUploadFile(file: File, id: number) {
-				file.size
-				const reader = new FileReader();
-				reader.readAsBinaryString(file);
-				reader.addEventListener('loadend', () => {
-					console.log(file.name, '开始计算文件校验码');
-					let contentBuffer = reader.result as string;
-					// 为什么用 Latin1：https://www.icode9.com/content-1-193333.html
-					let toEncode = CryptoJS.enc.Latin1.parse(contentBuffer);
-					let hash = CryptoJS.SHA1(toEncode).toString();
-					console.log(file.name, '校验码：' + hash);
-					fetch(`http://${server.entity.ip}:${server.entity.port}/upload/check/`, {
-						method: 'post',
-						body: JSON.stringify({
-							hashs: [hash]
-						}),
-						headers: new Headers({
-							'Content-Type': 'application/json'
-						}),
-					}).then((response) => {
-						response.text().then((text) => {
-							let content = JSON.parse(text) as number[];
-							if (content[0] % 2) {
-								console.log(file.name, '已缓存');
-								server.entity.mergeUploaded(id, [hash]);
-							} else {
-								console.log(file.name, '未缓存');
-								uploadFile(id, hash, file);
-							}
+		addTasks (inputList: string[] | FileList) {
+			async function checkAndUploadFile(filename: string, fileInfo: { size: 0, file: Buffer | Blob }, id: number) {
+				const { file } = fileInfo;
+				let buffer: Buffer | ArrayBuffer;
+				if (file instanceof Blob) {
+					const reader = new FileReader();
+					reader.readAsArrayBuffer(file);
+					buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+						reader.addEventListener('loadend', () => {
+							resolve(reader.result as ArrayBuffer);
 						})
 					});
-				})
+				} else {
+					buffer = file;
+				}
+				console.log(filename, '开始计算文件校验码');
+				const wordArray = CryptoJS.lib.WordArray.create(buffer);
+				let hash = CryptoJS.SHA1(wordArray).toString();
+				console.log(filename, '校验码：' + hash);		
+
+				fetch(`http://${server.entity.ip}:${server.entity.port}/upload/check/`, {
+					method: 'post',
+					body: JSON.stringify({
+						hashs: [hash]
+					}),
+					headers: new Headers({
+						'Content-Type': 'application/json'
+					}),
+				}).then((response) => {
+					response.text().then((text) => {
+						let content = JSON.parse(text) as number[];
+						if (content[0] % 2) {
+							console.log(filename, '已缓存');
+							server.entity.mergeUploaded(id, [hash]);
+						} else {
+							console.log(filename, '未缓存');
+							uploadFile(id, hash, filename, buffer);
+						}
+					})
+				});
 			}
-			function uploadFile(id: number, hash: string, file: File) {
+			function uploadFile(id: number, hash: string, filename: string, buffer: Buffer | ArrayBuffer) {
 				const currentServer = 这.currentServer.data;
 				const task = currentServer.tasks[id];
 				task.transferStatus = TransferStatus.uploading;
-				task.transferProgressLog.total = file.size;
+				task.transferProgressLog.total = buffer instanceof ArrayBuffer ? buffer.byteLength : buffer.length;
 				const form = new FormData();
 				form.append('name', hash);
-				form.append('file', file);
+				// form.append('file', file);
+				const file_blob = new Blob([buffer]);
+				form.append('file', file_blob, hash);
 				const xhr = new XMLHttpRequest;
 				xhr.upload.addEventListener('progress', (event) => {
 					// let progress = event.loaded / event.total;
@@ -166,19 +175,19 @@ export const useAppStore = defineStore('app', {
 					if (xhr.readyState !== 0) {
 						if (xhr.status >= 400 && xhr.status < 500) {
 							Popup({
-								message: `【${file.name}】网络请求故障，上传失败`,
+								message: `【${filename}】网络请求故障，上传失败`,
 								level: NotificationLevel.error,
 							})
 						} else if (xhr.status >= 500 && xhr.status < 600) {
 							Popup({
-								message: `【${file.name}】服务器故障，上传失败`,
+								message: `【${filename}】服务器故障，上传失败`,
 								level: NotificationLevel.error,
 							})
 						}
 					}
 				}
 				xhr.onload = function () {
-					console.log(file.name, `发送完成`);
+					console.log(filename, `发送完成`);
 					server.entity.mergeUploaded(id, [hash]);
 					task.transferStatus = TransferStatus.normal;
 					clearInterval(task.dashboardTimer);
@@ -190,31 +199,37 @@ export const useAppStore = defineStore('app', {
 				task.dashboardTimer = setInterval(dashboardTimer, 50, task) as any;
 			}
 			const 这 = useAppStore();
-			let fileCount = files.length;
-			let server = 这.currentServer;
-			let newlyAddedTaskIds: Promise<number>[] = [];
+			const server = 这.currentServer;
+			const isRemoteService = server.entity.ip !== 'localhost';
+			const newlyAddedTaskIds: Promise<number>[] = [];
 			let dropDelayCount = 0;
-			for (const file of files) {
-				setTimeout(() => {	// v2.4 版本开始完全可以不要延时，但是太生硬，所以加个动画
-					console.log('添加任务', file.path);
-					let isRemote = server.entity.ip !== 'localhost';
-					const limitedFileSizeMB = isRemote ? (这.functionLevel >= 60 ? 192 : 127) : Infinity;
-					// 超过约 200MB 的文件在进行 CryptoJS.SHA1 时会导致页面崩溃
-					if (file.size > limitedFileSizeMB * 1000 * 1000) {
-						Popup({
-							message: `${file.name} 文件大小超过 ${limitedFileSizeMB} MB，暂不支持上传操作`,
-							level: 2,
-						});
-						return;
+			for (const input of inputList) {
+				setTimeout(async () => {	// v2.4 版本开始完全可以不要延时，但是太生硬，所以加个动画
+					const filename = typeof input === 'string' ? path.parse(input).name : input.name;
+					const fileType = typeof input === 'string' ? (await nodeBridge.getPathsCategorized(input)).lineResults?.[0] : 'lf';
+					const needUpload = fileType === 'lf' && isRemoteService;	// 网页版必定是 remoteService；如果拖入的是文件而不是字符串那么必定是 lf（以后再支持文件夹拖入）
+					// console.log('添加任务', input, fileType);
+					let fileInfo: { size: number, file: Buffer | Blob };
+					if (needUpload) {
+						const limitedFileSizeMB = isRemoteService ? (这.functionLevel >= 60 ? 192 : 127) : Infinity;
+						// 超过约 200MB 的文件在进行 CryptoJS.SHA1 时会导致页面崩溃
+						fileInfo = typeof input === 'string' ? await nodeBridge.getLocalFile(input, limitedFileSizeMB * 1000 * 1000) : { file: input, size: input.size };
+						if (fileInfo.size > limitedFileSizeMB * 1000 * 1000) {
+							Popup({
+								message: `${filename} 文件大小超过 ${limitedFileSizeMB} MB，暂不支持上传操作`,
+								level: 2,
+							});
+							return;
+						}
 					}
-					let promise: Promise<number> = 这.addTask(trimExt(file.name), isRemote ? '' : file.path);
-					if (isRemote) {
+					let promise: Promise<number> = 这.addTask(trimExt(filename), needUpload ? '' : (typeof input === 'string' ? input : input.path));	// 网页版拖入文件必定上传，electron 版拖入文件则直接以路径输入
+					if (needUpload) {
 						promise.then((id) => {
-							checkAndUploadFile(file, id);
+							checkAndUploadFile(filename, fileInfo, id);
 						});
 					}
 					newlyAddedTaskIds.push(promise);
-					if (newlyAddedTaskIds.length === fileCount) {
+					if (newlyAddedTaskIds.length === inputList.length) {
 						Promise.all(newlyAddedTaskIds).then((ids) => {
 							这.selectedTask = new Set(ids);
 							// addTask 函数已经把当前的 globalParams 传了过去，因此后端在处理完成之后参数设置就与前端一样，无需 applySelectedTask

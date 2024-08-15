@@ -2,6 +2,7 @@ import { app, dialog, BrowserWindow, ipcMain, Menu, shell } from 'electron';
 // import ElectronStore from 'electron-store';
 import { exec } from 'child_process';
 import path from 'path';
+import parsePath from 'parse-path';
 import CryptoJS from 'crypto-js';
 import fs from 'fs/promises';
 import { TransferStatus } from '@common/types';
@@ -251,6 +252,111 @@ class ElectronApp {
 			shell.openPath(url);
 		});
 
+		// 将包含多行路径的字符串归类为本地文件、本地目录、远程文件的数量统计，及每行的类型
+		ipcMain.handle('getPathsCategorized', async (event, value: string) => {
+			const paths = value.split('\n').filter((line) => line !== '');
+			// const [localFiles, localDirs, remotes, unknowns] = [[], [], [], []] as string[][];
+			let [localFilesCount, localDirsCount, remotesCount, unknownsCount] = [0, 0, 0, 0];
+			const lineResults: ('lf' | 'ld' | 'r' | 'u')[] = [];
+			for (const path of paths) {
+				const fixedPath = path.startsWith('\\\\') ? 'file://' + path.slice(2) : path;	// 由于 node 的 URL 在解析 Windows 网络共享路径时会出错，故手动修一下
+				const result = parsePath(fixedPath);
+				if (result.parse_failed) {
+					// unknowns.push(path);
+					unknownsCount++;
+					lineResults.push('u');
+				} else if (result.host) {
+					// remotes.push(path);
+					remotesCount++;
+					lineResults.push('r');
+				} else {
+					try {
+						const stats = await fs.lstat(path);
+						if (stats.isDirectory()) {
+							// localDirs.push(path);
+							localDirsCount++;
+							lineResults.push('ld');
+						} else {
+							// localFiles.push(path);
+							localFilesCount++;
+							lineResults.push('lf');
+						}
+					} catch (e) {
+						// unknowns.push(path);
+						unknownsCount++;
+						lineResults.push('u');
+					}
+				}
+			}
+			return { localFilesCount, localDirsCount, remotesCount, unknownsCount, lineResults };
+		});
+
+		/**
+		 * 列出文件夹内的所有内容
+		 * @params path 指定文件夹
+		 * @params mode 'getFiles' | 'getDirectories'
+		 * @params recursive 是否递归查找子文件夹
+		 * @params fullPath 是否返回完整的绝对路径
+		 */
+		ipcMain.handle('listItemsInDirectory', async (event, options) => {
+			async function dfs(basePath: string, recursive = false, fullPath = false) {
+				const resultArr: Array<string> = [];
+				const directoriesArr: Array<string> = [];
+				const filesArr: Array<string> = [];
+				const fnd = await fs.readdir(basePath);
+				for (const fileName of fnd) {
+					const filePath = path.join(basePath, fileName);
+					const stats = await fs.stat(filePath);
+					if (stats.isFile()) {
+						filesArr.push(fullPath ? filePath : fileName);
+					}
+					if (stats.isDirectory()) {
+						directoriesArr.push(fullPath ? filePath : fileName);
+					}
+				}
+				if (options.mode === 'getFiles') {
+					resultArr.push(...filesArr);
+				}
+				if (options.mode === 'getDirectories') {
+					resultArr.push(...directoriesArr);
+				}
+				if (recursive) {
+					for (const directory of directoriesArr) {
+						const result = await dfs(fullPath ? directory : path.join(basePath, directory), recursive, fullPath);
+						resultArr.push(...result.resultArr);
+					}
+					return { filesArr, directoriesArr, resultArr };
+				}
+				return {
+					filesArr, // 当前文件夹下的所有文件
+					directoriesArr, // 当前文件夹下的所有文件夹
+					resultArr, // 依据选项查找的结果
+				};
+			}
+	
+			const stats = await fs.stat(options.path);
+			if (stats.isFile()) {
+				return undefined;
+			}
+			const result = await dfs(options.path, options.recursive, options.fullPath);
+			return result.resultArr;
+		});
+
+		// 获取本地文件。如果文件大小未超过限制，则计算 hash，返回文件内容、大小，否则只返回大小
+		ipcMain.handle('getLocalFile', async (event, url: string, limitSize: number) => {
+			const stats = await fs.stat(url);
+			if (!stats.isFile()) {
+				// 理论上不应出现对非本地文件调用此方法的现象，此处是为了避免用户手动将文件改为文件夹之类的特殊情况
+				return { size: 0, file: undefined };
+			}
+			if (stats.size > limitSize) {
+				return { size: stats.size, file: undefined };
+			}
+			console.log(url, '读取文件');
+			const buffer = await fs.readFile(url);
+			return { size: stats.size, file: buffer };
+		});
+
 		// 闪烁任务栏图标
 		ipcMain.on('flashFrame', (event, value) => {
 			this.mainWindow!.flashFrame(value);
@@ -296,12 +402,9 @@ class ElectronApp {
 		});
 
 		// 打开“打开文件”对话框
-		ipcMain.handle('showOpenDialog', (event, options: Electron.OpenDialogOptions) => {
-			return new Promise(resolve => {
-				dialog.showOpenDialog(this.mainWindow, options).then((result) => {
-					resolve(result.canceled ? [] : result.filePaths);
-				});
-			});
+		ipcMain.handle('showOpenDialog', async (event, options: Electron.OpenDialogOptions) => {
+			const result = await dialog.showOpenDialog(this.mainWindow, options);
+			return result.canceled ? [] : result.filePaths;
 		});
 		  
 		// 读取 LICENSE 文件

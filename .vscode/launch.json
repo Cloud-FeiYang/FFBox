@@ -35,7 +35,7 @@
       "preLaunchTask": "启动 webpack:backend 脚本 (dev)",
     },
     {
-      "name": "插入调试后端",
+      "name": "插入调试主进程",
       "type": "node",
       "request": "attach",
       "port": 9229,
