@@ -2519,8 +2519,8 @@ const generator = {
 					}
 				}
 								// 调试用↓
-								ret.push('-threads')
-								ret.push('1')
+								// ret.push('-threads')
+								// ret.push('1')
 								// 调试用↑
 				const ratecontrol = (vencoder.ratecontrol || []).find((item) => item.value === videoParams.ratecontrol);
 				if (ratecontrol) {

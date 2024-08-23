@@ -297,22 +297,35 @@ const handleTopMenuHover = (index: number) => {
 
 const handleMenuItemClicked = (event: Event, value: any) => {
 	// 从 finalMenu 中找 value 相同的菜单项
-	function dfs(menuItems: MenuItem[]): MenuItem | undefined {
+	function dfs(menuItems: MenuItem[]): { item: MenuItem, route: any[] } | undefined {
 		for (const menuItem of menuItems) {
 			if (menuItem.type === 'submenu') {
 				const result = dfs(menuItem.subMenu);
 				if (result) {
-					return result;
+					return {
+						item: result.item,
+						route: result.route.concat(menuItem.label),
+					}
 				}
 			} else if ('value' in menuItem && menuItem.value === value) {
-				return menuItem;
+				return { item: menuItem, route: [menuItem.value] };
 			}
 		}
 	}
 	const correspondingMenuItem = dfs(finalMenu.value);
 	// 若找到该项，该项配置了 onClick，则触发
-	if (correspondingMenuItem && 'onClick' in correspondingMenuItem) {
-		correspondingMenuItem.onClick(event, value);
+	if (correspondingMenuItem && 'onClick' in correspondingMenuItem.item) {
+		const ret = correspondingMenuItem.item.onClick(event, value);
+		if (ret === true) {
+			appStore.showMenuCenter = 0;
+		} else if (ret === false) {
+		} else {
+			// 针对特定菜单下的项进行额外的关闭菜单面板逻辑，这样就不用在 finalMenu 那里每项都写这些东西了
+			const route = correspondingMenuItem.route;
+			if (route.includes('服务器 (S)') || route.includes('任务 (T)')) {
+				appStore.showMenuCenter = 0;
+			}
+		}
 	}
 };
 

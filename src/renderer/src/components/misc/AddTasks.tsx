@@ -1,16 +1,16 @@
 import { computed, defineComponent, defineExpose, onMounted, ref } from "vue";
 import nodeBridge from "@renderer/bridges/nodeBridge";
 import { useAppStore } from "@renderer/stores/appStore";
-import RadioList, { Props as RadioListProps } from '@renderer/containers/MainFrame/MainArea/ParaBox/components/RadioList.vue';
+// import RadioList, { Props as RadioListProps } from '@renderer/containers/MainFrame/MainArea/ParaBox/components/RadioList.vue';
 import Msgbox from "../Msgbox/Msgbox";
 import Button, { ButtonType } from '@renderer/components/Button/Button';
 import style from './AddTasks.module.less';
 import Popup from "../Popup/Popup";
 
-const selectionList: RadioListProps['list'] = [
-	{ value: 'batch', caption: '分别处理' },
-	{ value: 'concat', caption: '拼接' },
-];
+// const selectionList: RadioListProps['list'] = [
+// 	{ value: 'batch', caption: '分别处理' },
+// 	{ value: 'concat', caption: '拼接' },
+// ];
 
 export function showAddTaskPrompt(initialValue?: string) {
 	let compFuncs: any;

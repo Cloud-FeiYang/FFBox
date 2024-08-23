@@ -128,12 +128,13 @@ export function dashboardTimer(task: UITask) {
 		}
 
 		// 进度细节计算
+		const afterFramerate = task.after.video.framerate === '不改变' ? task.before.vframerate : +task.after.video.framerate;
 		if (progress < 0.995) {
 			task.dashboard = {
 				...task.dashboard,
 				progress,
 				bitrate: (sizeK / timeK) * 8,
-				speed: frameK / task.before.vframerate || timeK,	// 如果可以读出帧速，或者输出的是视频，用帧速算 speed 更准确；否则用时间算 speed
+				speed: frameK / afterFramerate || timeK,	// 如果可以读出帧速，或者输出的是视频，用帧速算 speed 更准确；否则用时间算 speed
 				time: currentTime,
 				frame: currentFrame,
 				size: currentSize,
@@ -158,13 +159,14 @@ export function dashboardTimer(task: UITask) {
 			task.dashboard.progress = 1;
 		}
 	} else {
-		if (task.transferProgressLog.transferred.length <= 2) {
+		const transferProgressLog = task.transferProgressLog;
+		if (transferProgressLog.transferred.length <= 2) {
 			// 任务刚开始时显示的数据不准确
 			return;
 		}
 
-		const elapsedTime = new Date().getTime() / 1000 - 0;	// TODO！！
-		const { K: transferredK, B: transferredB, currentValue: currentTransferred } = calcDashboard(task.transferProgressLog.transferred.slice(-5), elapsedTime);
+		const elapsedTime = new Date().getTime() / 1000 - transferProgressLog.lastStarted + transferProgressLog.elapsed;
+		const { K: transferredK, B: transferredB, currentValue: currentTransferred } = calcDashboard(transferProgressLog.transferred.slice(-5), elapsedTime);
 		// console.log(`transferredK: ${transferredK}`);
 		// console.log(`currentTransferred: ${currentTransferred}`);
 
@@ -179,7 +181,7 @@ export function dashboardTimer(task: UITask) {
 			task.dashboard = {
 				...task.dashboard,
 				transferred: currentTransferred,
-				transferSpeed: transferredK / 1000,
+				transferSpeed: transferredK,
 			};
 
 			// 平滑处理

@@ -19,18 +19,17 @@ export interface UITask extends Task {
 		time: number;
 		frame: number;
 		size: number;	// kB
-		transferred: number;
-		transferSpeed: number;
+		transferred: number;	// B
+		transferSpeed: number;	// Bps
 	};
 	dashboardTimer: number;
 	transferStatus: TransferStatus;
 	transferProgressLog: {
-		transferred: SingleProgressLog;
-		total: number;
-		// 涉及到的时间单位均为 s
-		// lastStarted: number;
-		// elapsed: number;		// 暂停才更新一次，因此记录的并不是实时的任务时间
-		// lastPaused: number;		// 既用于暂停后恢复时计算速度，也用于统计任务耗时
+		transferred: SingleProgressLog;	// B
+		total: number;					// B
+		lastStarted: number; 	// s
+		elapsed: number;		// s　暂停才更新一次，因此记录的并不是实时的任务时间
+		lastPaused: number;		// s　既用于暂停后恢复时计算速度，也用于统计任务耗时
 	};
 }
 

@@ -7,7 +7,7 @@ export type MenuItem = {
 	label: string;
 	tooltip?: string;
 	disabled?: boolean;
-	onClick?: (event: Event, value: any) => void;
+	onClick?: (event: Event, value: any) => boolean | void;	// true 值用于关闭菜单面板
 } | {
     type: 'separator';
 } | {
@@ -24,7 +24,7 @@ export type MenuItem = {
 	label: string;
 	tooltip?: string;
 	disabled?: boolean;
-	onClick?: (event: Event, checked: boolean) => void;
+	onClick?: (event: Event, checked: boolean) => boolean | void;	// true 值用于关闭菜单面板
 };
 
 /**

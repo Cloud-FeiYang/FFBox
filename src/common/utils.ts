@@ -371,6 +371,9 @@ export function getInitialUITask(fileName: string, outputParams?: OutputParams):
 			transferProgressLog: {
 				transferred: [],
 				total: NaN,
+				lastStarted: new Date().getTime() / 1000,
+				elapsed: 0,
+				lastPaused: new Date().getTime() / 1000,	
 			},
 		},
 	};

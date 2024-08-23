@@ -114,7 +114,7 @@ export const useAppStore = defineStore('app', {
 		 * 添加一系列任务。仅支持本地文件和远程路径，本地文件夹需展开后再传入，未知路径传入无效
 		 */
 		addTasks (inputList: string[] | FileList) {
-			async function checkAndUploadFile(filename: string, fileInfo: { size: 0, file: Buffer | Blob }, id: number) {
+			async function checkAndUploadFile(filename: string, fileInfo: { size: number, file: Buffer | Blob }, id: number) {
 				const { file } = fileInfo;
 				let buffer: Buffer | ArrayBuffer;
 				if (file instanceof Blob) {
@@ -129,7 +129,7 @@ export const useAppStore = defineStore('app', {
 					buffer = file;
 				}
 				console.log(filename, '开始计算文件校验码');
-				const wordArray = CryptoJS.lib.WordArray.create(buffer);
+				const wordArray = CryptoJS.lib.WordArray.create(buffer as any);
 				let hash = CryptoJS.SHA1(wordArray).toString();
 				console.log(filename, '校验码：' + hash);		
 
@@ -159,6 +159,8 @@ export const useAppStore = defineStore('app', {
 				const task = currentServer.tasks[id];
 				task.transferStatus = TransferStatus.uploading;
 				task.transferProgressLog.total = buffer instanceof ArrayBuffer ? buffer.byteLength : buffer.length;
+				const lastStarted = new Date().getTime() / 1000;
+				task.transferProgressLog.lastStarted = lastStarted;
 				const form = new FormData();
 				form.append('name', hash);
 				// form.append('file', file);
@@ -168,8 +170,7 @@ export const useAppStore = defineStore('app', {
 				xhr.upload.addEventListener('progress', (event) => {
 					// let progress = event.loaded / event.total;
 					const transferred = task.transferProgressLog.transferred;
-					transferred.push([new Date().getTime() / 1000, event.loaded]);
-					transferred.splice(0, transferred.length - 3);	// 限制列表最大长度为 3
+					transferred.push([new Date().getTime() / 1000 - lastStarted, event.loaded]);
 				}, false);
 				xhr.onreadystatechange = function (e) {
 					if (xhr.readyState !== 0) {

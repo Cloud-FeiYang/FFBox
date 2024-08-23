@@ -1,4 +1,4 @@
-import { computed, defineComponent, defineProps, FunctionalComponent, onBeforeUnmount, ref, Transition, VNodeRef, watch, onUnmounted, toRef, onMounted, StyleValue } from 'vue'; // defineComponent 的主要功能是提供类型检查
+import { computed, defineComponent, onBeforeUnmount, ref, Transition, watch, onMounted, StyleValue } from 'vue';
 import { TaskStatus, TransferStatus } from '@common/types';
 import { UITask } from '@renderer/types'
 import { generator as vGenerator } from '@common/params/vcodecs';
@@ -109,11 +109,20 @@ export const TaskItem = defineComponent((props: Props) => {
 	};
 	const graphTime = computed(() => timeFilter(props.task.dashboard_smooth.time));
 	const graphLeftTime = computed(() => {
-		const totalDuration = outputDuration.value;
-		if (props.task.dashboard_smooth.speed > 0) {
-			const needTime = totalDuration / props.task.dashboard_smooth.speed;
-			const remainTime = (totalDuration - props.task.dashboard_smooth.time) / totalDuration * needTime;	// 剩余进度比例 * 全进度耗时
-			return timeFilter(remainTime, false);
+		if (props.task.transferStatus === 'normal') {
+			const totalDuration = outputDuration.value;
+			if (props.task.dashboard_smooth.speed > 0) {
+				const needTime = totalDuration / props.task.dashboard_smooth.speed;
+				const remainTime = (totalDuration - props.task.dashboard_smooth.time) / totalDuration * needTime;	// 剩余进度比例 * 全进度耗时
+				return timeFilter(remainTime, false);
+			}
+		} else {
+			const totalSize = props.task.transferProgressLog.total;
+			if (props.task.dashboard_smooth.transferSpeed > 0) {
+				const needTime = totalSize / props.task.dashboard_smooth.transferSpeed;
+				const remainTime = (totalSize - props.task.dashboard_smooth.transferred) / totalSize * needTime;	// 剩余进度比例 * 全进度耗时
+				return timeFilter(remainTime, false);
+			}
 		}
 		return '-';
 	});
@@ -146,8 +155,7 @@ export const TaskItem = defineComponent((props: Props) => {
 		}
 	};
 	const graphSize = computed(() => graphSizeFilter(props.task.dashboard_smooth.size));
-	const transferSpeedFilter = (kBps: number) => {
-		const Bps = kBps * 1000;
+	const transferSpeedFilter = (Bps: number) => {
 		if (window.frontendSettings.useIEC) {
 			if (Bps >= 100 * 1024 ** 2) {
 				return (Bps / 1024 ** 2).toFixed(0) + ' MiB';
@@ -188,14 +196,14 @@ export const TaskItem = defineComponent((props: Props) => {
 		return `background: conic-gradient(var(--primaryColor) 0%, var(--primaryColor) ${value * 75}%, hwb(var(--opposite80) / 0.1) ${value * 75}%, hwb(var(--opposite80) / 0.1) 75%, transparent 75%)`;
 	});
 	const graphTransferSpeedStyle = computed(() => {
-		let value = Math.log(props.task.dashboard_smooth.transferSpeed / 62.5) / Math.log(10) / 4;	// 62.5K, 500K, 4M, 32M, 256M, 512M, 1024M
+		let value = Math.log(props.task.dashboard_smooth.transferSpeed / 62500) / Math.log(10) / 4;	// 62.5K, 500K, 4M, 32M, 256M, 512M, 1024M
 		value = Math.min(Math.max(value, 0), 1);
 		return `background: conic-gradient(var(--primaryColor) 0%, var(--primaryColor) ${value * 75}%, hwb(var(--opposite80) / 0.1) ${value * 75}%, hwb(var(--opposite80) / 0.1) 75%, transparent 75%)`;
 	});
 
 	const overallProgress = computed(() => props.task.transferStatus === 'normal' ? props.task.dashboard_smooth.progress : props.task.dashboard_smooth.transferred / props.task.transferProgressLog.total);
 	// const overallProgress = { value: 0.99 };
-	const overallProgressDescription = computed(() => props.task.transferStatus === 'normal' ? '转码进度' : '上传进度');
+	const overallProgressDescription = computed(() => ['转码进度', '上传进度', '下载进度'][['normal', 'uploading', 'downloading'].indexOf(props.task.transferStatus)] );
 
 	// #endregion
 
@@ -262,9 +270,17 @@ export const TaskItem = defineComponent((props: Props) => {
 		}
 	});
 
-	const taskBackgroundProgressStyle = computed(() => ({
-		width: (props.task.transferStatus === 'normal' ? props.task.dashboard_smooth.progress : props.task.dashboard_smooth.transferred / props.task.transferProgressLog.total) * 100 + '%' }
-	));
+	const taskBackgroundProgressStyle = computed(() => {
+		const taskProgress = (props.task.dashboard_smooth.progress) * 100 + '%';
+		const transferProgress = (props.task.dashboard_smooth.transferred / props.task.transferProgressLog.total) * 100 + '%';
+		return {
+			green: { width: taskProgress, opacity: [TaskStatus.TASK_RUNNING, TaskStatus.TASK_FINISHING].includes(props.task.status) ? 1 : 0},
+			yellow: { width: taskProgress, opacity: [TaskStatus.TASK_PAUSED, TaskStatus.TASK_STOPPING].includes(props.task.status) ? 1 : 0},
+			gray: { width: taskProgress, opacity: [TaskStatus.TASK_FINISHED, TaskStatus.TASK_STOPPED].includes(props.task.status) ? 1 : 0},
+			red: { width: taskProgress, opacity: props.task.status === TaskStatus.TASK_ERROR ? 1 : 0},
+			blue: { width: transferProgress, opacity: props.task.transferStatus === 'normal' ? 0 : 1 },
+		} as { [key: string]: StyleValue };
+	});
 
 	// #endregion
 
@@ -380,11 +396,11 @@ export const TaskItem = defineComponent((props: Props) => {
 					onDblclick={handleTaskDblClicked}
 				>
 					<div class={style.backgroundWhite} style={taskBackgroundStyle.value} />
-					<div class={`${style.backgroundProgress} ${style.progressBlue}`} style={{ ...taskBackgroundProgressStyle.value, opacity: props.task.status === TaskStatus.TASK_INITIALIZING ? 1: 0}} />
-					<div class={`${style.backgroundProgress} ${style.progressGreen}`} style={{ ...taskBackgroundProgressStyle.value, opacity: [TaskStatus.TASK_RUNNING, TaskStatus.TASK_FINISHING].includes(props.task.status) ? 1: 0}} />
-					<div class={`${style.backgroundProgress} ${style.progressYellow}`} style={{ ...taskBackgroundProgressStyle.value, opacity: [TaskStatus.TASK_PAUSED, TaskStatus.TASK_STOPPING].includes(props.task.status) ? 1: 0}} />
-					<div class={`${style.backgroundProgress} ${style.progressGray}`} style={{ ...taskBackgroundProgressStyle.value, opacity: [TaskStatus.TASK_FINISHED, TaskStatus.TASK_STOPPED].includes(props.task.status) ? 1: 0}} />
-					<div class={`${style.backgroundProgress} ${style.progressRed}`} style={{ ...taskBackgroundProgressStyle.value, opacity: props.task.status === TaskStatus.TASK_ERROR ? 1: 0}} />
+					<div class={`${style.backgroundProgress} ${style.progressGreen}`} style={taskBackgroundProgressStyle.value.green} />
+					<div class={`${style.backgroundProgress} ${style.progressYellow}`} style={taskBackgroundProgressStyle.value.yellow} />
+					<div class={`${style.backgroundProgress} ${style.progressGray}`} style={taskBackgroundProgressStyle.value.gray} />
+					<div class={`${style.backgroundProgress} ${style.progressRed}`} style={taskBackgroundProgressStyle.value.red} />
+					<div class={`${style.backgroundProgress} ${style.progressBlue}`} style={taskBackgroundProgressStyle.value.blue} />
 					<div class={style.previewIcon} style={{ bottom: settings.showCmd ? '66px' : undefined}}>
 						<IconPreview />
 					</div>
@@ -506,22 +522,22 @@ export const TaskItem = defineComponent((props: Props) => {
 									</>
 								) : (
 									<>
-										<div class={style.roundGraphItem}>
+										<div class={style.roundGraphItem} onClick={() => showProgressInfo(props.task, props.id, 'transferSpeed')}>
 											<div class={style.ring} style={graphTransferSpeedStyle.value}></div>
 											<span class={style.data}>{ graphTransferSpeed.value }</span>
 											<span class={style.description}>传输秒速</span>
 										</div>
-										<div class={style.textItem}>
+										<div class={style.textItem} onClick={() => showProgressInfo(props.task, props.id, 'transferProgress')}>
 											<span class={style.data}>{graphTransferred.value}</span>
 											<span class={style.description}>传输总量</span>
 										</div>
 									</>
 								)}
-								<div class={style.textItem} onClick={() => showProgressInfo(props.task, props.id, 'progress')}>
+								<div class={style.textItem} onClick={() => showProgressInfo(props.task, props.id, dashboardType.value === 'convert' ? 'progress' : 'transferProgress')}>
 									<span class={style.data}>{ graphLeftTime.value }</span>
 									<span class={style.description}>预计剩余时间</span>
 								</div>
-								<div class={style.textItem} onClick={() => showProgressInfo(props.task, props.id, 'progress')}>
+								<div class={style.textItem} onClick={() => showProgressInfo(props.task, props.id, dashboardType.value === 'convert' ? 'progress' : 'transferProgress')}>
 									<span class={`${style.data} ${style.dataLarge}`}>{ overallProgress.value === 1 ? '🆗' : `${(overallProgress.value * 100).toFixed(1)}%` }</span>
 									<span class={style.description}>{ overallProgressDescription.value }</span>
 								</div>
