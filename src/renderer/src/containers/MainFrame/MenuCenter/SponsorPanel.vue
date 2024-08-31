@@ -39,7 +39,8 @@ const envelopStyle = computed(() => {
 const jumpToGithub = () => nodeBridge.jumpToUrl('https://github.com/ttqftech/FFBox');
 const jumpToGitee = () => nodeBridge.jumpToUrl('https://gitee.com/ttqf/FFBox');
 const jumpToKoFi = () => nodeBridge.jumpToUrl('https://ko-fi.com/N4N26F2WR');
-const jumpToAfdian = () => nodeBridge.jumpToUrl('https://afdian.net/a/ttqftech');
+const jumpToAfdian = () => nodeBridge.jumpToUrl('https://afdian.com/a/ttqftech');
+const jumpToAutoSponsorProxy = () => nodeBridge.jumpToUrl('http://ffbox.ttqf.tech/AutoSponsorProxy.html');
 
 // 传入 HexEditor 从第一个像素开始的内容，需要 4 位灰度色 bmp，反向行序
 // 传入二维码大小
@@ -169,6 +170,9 @@ onMounted(() => {
 			<Button @click="jumpToAfdian" @mouseleave="Tooltip.hide()" @mouseenter="handleElementHover($event, '这个似乎更适合中国宝宝的体质❤️～')">
 				<img :src="IconAfdian" />爱发电
 			</Button>
+			<Button @click="jumpToAutoSponsorProxy" @mouseleave="Tooltip.hide()" @mouseenter="handleElementHover($event, '如果有哪天左边的某个按钮失效了就点这个吧🌚（当然也不排除这个按钮会失效')">
+				帮我挑个合适的
+			</Button>
 		</div>
 		<p>🍲赛博红包来咯~</p>
 		<div class="paragram">
@@ -240,6 +244,7 @@ onMounted(() => {
 		justify-content: center;
 		flex-wrap: wrap;
 		margin-bottom: 24px;
+		gap: 8px 0;
 		&>button {
 			svg, img {
 				width: 20px;

@@ -39,7 +39,8 @@ AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
 
-VersionInfoDescription={#MyAppName}安装程序
+; VersionInfoDescription 指示输出文件的“文件说明”
+VersionInfoDescription={#MyAppName} 安装程序
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoVersion={#MyAppVersion}
 VersionInfoProductVersion={#MyAppVersion}
@@ -90,8 +91,10 @@ Source: "{#MyAppPkgDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdir
 
 [Icons]
 ; Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}" 
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; AfterInstall: ShoutcutRunAsAdmin('{group}\{#MyAppName}.lnk');
-Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon ; AfterInstall: ShoutcutRunAsAdmin('{commondesktop}\{#MyAppName}.lnk');
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}";
+Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon;
+; Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; AfterInstall: ShoutcutRunAsAdmin('{group}\{#MyAppName}.lnk');
+; Name: "{commondesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon ; AfterInstall: ShoutcutRunAsAdmin('{commondesktop}\{#MyAppName}.lnk');
 ; Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppName}"; Filename:"{app}\{#MyAppExeName}"; Tasks: quicklaunchicon  ; AfterInstall: ShoutcutRunAsAdmin('{userappdata}\Microsoft\Internet Explorer\Quick Launch\{#MyAppName}.lnk');
 ; Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\{#MyAppName}"; Filename:"{app}\{#MyAppExeName}"; Tasks: quicklaunchicon ; AfterInstall: ShoutcutRunAsAdmin('{userappdata}\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\{#MyAppName}.lnk');
 
@@ -141,6 +144,7 @@ var
 
 // // // // // // // // // // // // 功能函数 // // // // // // // // // // // //
 
+// 修改快捷方式为以管理员身份运行
 procedure ShoutcutRunAsAdmin(Filename:string);
 var 
   Buffer:String;
