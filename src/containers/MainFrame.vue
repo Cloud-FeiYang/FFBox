@@ -129,6 +129,9 @@ onMounted(async () => {
 					<div class="seperator"></div>
 					<button @click="handleTopBarButtonClicked(2)">使用条款</button>
 				</div>
+				<div class="versionInfo">
+					<div>版本：4.2&nbsp;&nbsp;(2024-09-01)</div>
+				</div>
 			</div>
 			<div class="FFBox-topWrapper" :style="FFBoxTopWrapperStyle">
 				<div class="FFBox-wrapper" :style="FFBoxWrapperStyle">
@@ -387,6 +390,17 @@ onMounted(async () => {
 					height: 16px;
 					margin: 0 -1px;
 					background-color: #777;
+				}
+			}
+			.versionInfo {
+				margin-top: 12px;
+				div {
+					display: inline-block;
+					padding: 12px 80px 0;
+					color: var(--66);
+					border-top: 1px solid hwb(var(--opposite80) / 0.5);
+					font-size: 12px;
+					opacity: 0.7;
 				}
 			}
 		}

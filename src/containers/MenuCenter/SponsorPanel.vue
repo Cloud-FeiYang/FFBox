@@ -20,7 +20,7 @@ const qr_qqpay = ref<HTMLCanvasElement>();
 const jumpToGithub = () => window.open('https://github.com/ttqftech/FFBox', '_blank');
 const jumpToGitee = () => window.open('https://gitee.com/ttqf/FFBox', '_blank');
 const jumpToKoFi = () => window.open('https://ko-fi.com/N4N26F2WR', '_blank');
-const jumpToAfdian = () => window.open('https://afdian.net/a/ttqftech');
+const jumpToAfdian = () => window.open('https://afdian.com/a/ttqftech');
 
 // 传入 HexEditor 从第一个像素开始的内容，需要 4 位灰度色 bmp，反向行序
 // 传入二维码大小
