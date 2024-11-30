@@ -90,22 +90,36 @@ const finalMenu = computed(() => {
 				} },
 				{ type: 'normal', label: '停止所有任务', value: '停止所有任务', tooltip: '将当前服务器所有运行中、已暂停的任务进行软停止操作', onClick: () => {
 					for (const [id, task] of Object.entries(appStore.currentServer?.data.tasks) || []) {
-						if (task.status === TaskStatus.TASK_RUNNING || task.status === TaskStatus.TASK_PAUSED)
+						if ([TaskStatus.idle_queued, TaskStatus.running, TaskStatus.paused, TaskStatus.paused_queued].includes(task.status))
 						appStore.currentServer.entity.taskReset(+id);
 					}
 				} },
-				{ type: 'normal', label: '删除所有未在运行任务', value: '删除所有未在运行任务', tooltip: '将当前服务器所有已完成、已停止、出错的任务删除', onClick: () => {
+				{ type: 'normal', label: '删除所有已完成任务', value: '删除所有已完成任务', tooltip: '将当前服务器所有已完成的任务删除', onClick: () => {
 					for (const [id, task] of Object.entries(appStore.currentServer.data.tasks)) {
-						if ([TaskStatus.TASK_FINISHED, TaskStatus.TASK_STOPPED, TaskStatus.TASK_ERROR].includes(task.status)) {
+						if (task.status === TaskStatus.finished) {
 							appStore.currentServer.entity.taskDelete(+id);
+						}
+					}
+				} },
+				{ type: 'normal', label: '删除所有未启动任务', value: '删除所有未启动任务', tooltip: '将当前服务器所有空闲、排队开始的任务删除', onClick: () => {
+					for (const [id, task] of Object.entries(appStore.currentServer.data.tasks)) {
+						if ([TaskStatus.idle, TaskStatus.idle_queued].includes(task.status)) {
+							appStore.currentServer.entity.taskDelete(+id);
+						}
+					}
+				} },
+				{ type: 'normal', label: '重置所有已完成任务', value: '重置所有已完成任务', tooltip: '将当前服务器所有已完成的任务重置到空闲状态', onClick: () => {
+					for (const [id, task] of Object.entries(appStore.currentServer.data.tasks)) {
+						if (task.status === TaskStatus.finished) {
+							appStore.currentServer.entity.taskReset(+id);
 						}
 					}
 				} },
 				{ type: 'separator' },
 				{ type: 'normal', label: '开始执行队列', value: '开始执行队列', disabled: appStore.currentServer.data.workingStatus === WorkingStatus.running, onClick: () => {
-					appStore.currentServer.entity.queueAssign();
+					appStore.currentServer.entity.queueStart();
 				} },
-				{ type: 'normal', label: '暂停执行队列', value: '暂停执行队列', disabled: appStore.currentServer.data.workingStatus !== WorkingStatus.running, onClick: () => {
+				{ type: 'normal', label: '暂停执行队列', value: '暂停执行队列', disabled: appStore.currentServer.data.workingStatus === WorkingStatus.idle, onClick: () => {
 					appStore.currentServer.entity.queuePause();
 				}},
 			] : [

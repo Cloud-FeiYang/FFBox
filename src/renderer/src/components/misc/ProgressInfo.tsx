@@ -227,7 +227,7 @@ const Comp = defineComponent((props: P) => {
 	const getEstimatedMaxTimeSize = () => {
 		const lastSpeedBitrate = getLastSpeedBitrate();
 		const { progressLog } = task;
-		const elapsedTime = progressLog.elapsed + (task.status === TaskStatus.TASK_RUNNING ? new Date().getTime() / 1000 - progressLog.lastStarted : 0);
+		const elapsedTime = progressLog.elapsed + (task.status === TaskStatus.running ? new Date().getTime() / 1000 - progressLog.lastStarted : 0);
 		// 任务最新进度的时间和大小
 		const currentTime = progressLog.time.length > 0 ? progressLog.time[progressLog.time.length - 1][1] : 0;
 		const currentSize = progressLog.size.length > 0 ? progressLog.size[progressLog.size.length - 1][1] : 0;

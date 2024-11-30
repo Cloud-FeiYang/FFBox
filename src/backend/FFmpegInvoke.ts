@@ -62,6 +62,7 @@ export class FFmpeg extends (EventEmitter as new () => TypedEventEmitter<FFmpegI
 			})
 			.catch((reason) => {
 				console.error(reason);
+				this.emit('version', {});
 			});
 		this.process = null;
 

@@ -8,7 +8,7 @@ import { ServiceTask, TaskStatus, OutputParams, FFBoxServiceEvent, Notification,
 import { getFFmpegParaArray, getFFmpegParaArrayOutputPath } from '@common/getFFmpegParaArray';
 import { generator as fGenerator } from '@common/params/formats';
 import { defaultParams } from '@common/defaultParams';
-import { getInitialServiceTask, convertAnyTaskToTask, getTimeString, TypedEventEmitter, replaceOutputParams, randomString } from '@common/utils';
+import { getInitialServiceTask, convertAnyTaskToTask, logMsg, TypedEventEmitter, replaceOutputParams, randomString } from '@common/utils';
 import { getMachineId } from './utils';
 import { FFmpeg } from './FFmpegInvoke';
 import UIBridge from './uiBridge';
@@ -24,7 +24,7 @@ export interface FFBoxServerEvent {
 export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<FFBoxServiceEvent & FFBoxServerEvent>) implements FFBoxServiceInterface {
 	public tasklist: ServiceTask[] = [];
 	private latestTaskId = 0;
-	private workingStatus: WorkingStatus = WorkingStatus.stopped;
+	private workingStatus: WorkingStatus = WorkingStatus.idle;
 	private ffmpegVersion = '';
 	private ffmpegPath = 'ffmpeg';
 	private globalTask: ServiceTask;
@@ -35,7 +35,7 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 
 	constructor() {
 		super();
-		console.log(getTimeString(new Date()), '正在初始化 FFBox 服务。');
+		logMsg('正在初始化 FFBox 服务。');
 		this.globalTask = getInitialServiceTask('');
 		this.tasklist[-1] = this.globalTask;
 		setTimeout(() => {
@@ -67,11 +67,11 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 	}
 
 	/**
-	 * 检测 ffmpeg 版本，并调用 getFFmpegVersion
+	 * 检测 ffmpeg 版本，并 emit ffmpegVersion
 	 * @emits ffmpegVersion
 	 */
 	public async initFFmpeg(): Promise<void> {
-		console.log(getTimeString(new Date()), '检查 FFmpeg 路径和版本。');
+		logMsg('检查 FFmpeg 路径和版本。');
 		if (process.platform === 'darwin') {
 			await fsPromise.access(path.join(process.execPath, '../ffmpeg'), fs.constants.X_OK).then((result) => {
 				this.ffmpegPath = path.join(process.execPath, '../ffmpeg'); // 【程序目录】沙箱运行模式，service 与 ffmpeg 处在同一层级
@@ -102,30 +102,44 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 			} else {
 				this.ffmpegVersion = '';
 			}
-			this.getFFmpegVersion();
+			logMsg('FFmpeg 路径和版本检查完毕。', this.ffmpegPath, this.ffmpegVersion);
+			this.emitFFmpegVersion();
 		});
 	}
 
 	/**
-	 * 直接获取当前 ffmpeg 版本
+	 * 向所有客户端更新当前 ffmpeg 版本
 	 * @emits ffmpegVersion
 	 */
-	public getFFmpegVersion(): void {
+	public emitFFmpegVersion(): void {
 		this.emit('ffmpegVersion', { content: this.ffmpegVersion });
 	}
 
 	/**
+	 * 向所有客户端更新单个任务
+	 * @param id 任务 id
+	 * @param task 直接传入 task 可减少一次内存查找
+	 */
+	private emitTaskUpdate(id: number, task?: ServiceTask): void {
+		const _task = task || this.tasklist[id];
+		if (_task) {
+			this.emit('taskUpdate', {
+				taskId: id,
+				task: convertAnyTaskToTask(_task),
+			});
+		}
+	}
+
+	/**
 	 * 新增任务
-	 * @param filePath 全访问路径
-	 * @param fileName 全文件名
 	 * @emits tasklistUpdate
 	 */
-	public taskAdd(fileBaseName: string, outputParams: OutputParams): Promise<number> {
+	public taskAdd(taskName: string, outputParams: OutputParams): Promise<number> {
 		const id = this.latestTaskId++;
 		// 目前只处理单输入的情况
 		const filePath = outputParams.input.files[0].filePath;
-		console.log(getTimeString(new Date()), `新增任务：${fileBaseName}（${filePath ? '本地' : '网络'}）。id：${id}。`);
-		const task = getInitialServiceTask(fileBaseName, outputParams);
+		logMsg(`[任务 ${id}] 新增任务：${taskName}（${filePath ? '本地' : '网络'}）。`);
+		const task = getInitialServiceTask(taskName, outputParams);
 		this.tasklist[id] = task;
 
 		// 更新命令行参数
@@ -138,7 +152,7 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 			task.outputFile = fGenerator.getOutputPathRemote(task.after.output, `${new Date().getTime()}${randomString(3)}`);
 			task.paraArray = getFFmpegParaArray(task.after, true, undefined, undefined, task.outputFile);
 			// 网络文件等待上传完成后再另行调用获取媒体信息
-			task.status = TaskStatus.TASK_INITIALIZING;
+			task.status = TaskStatus.initializing;
 			task.remoteTask = true;
 		}
 
@@ -152,6 +166,7 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 	 */
 	private getFileMetadata(id: number, task: ServiceTask, filePath: string): void {
 		// FFmpeg 读取媒体信息
+		logMsg(`[任务 ${id}] 读取输入媒体信息。`);
 		const ffmpeg = new FFmpeg(this.ffmpegPath, 2, ['-hide_banner', '-i', filePath, '-f', 'null']);
 		ffmpeg.on('data', ({ content }) => {
 			this.setCmdText(id, content);
@@ -165,10 +180,7 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 			task.before.vframerate = parseInt(input.vframerate || '-1');
 			task.before.acodec = input.acodec || '-';
 			task.before.abitrate = parseInt(input.abitrate || '-1');
-			this.emit('taskUpdate', {
-				taskId: id,
-				task: convertAnyTaskToTask(task),
-			});
+			this.emitTaskUpdate(id, task);
 		});
 		ffmpeg.on('critical', ({ content: errors }) => {
 			let reason = '';
@@ -209,50 +221,52 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 				}
 			});
 		}
-		task.status = TaskStatus.TASK_STOPPED;
+		task.status = TaskStatus.idle;
 		this.getFileMetadata(id, task, task.after.input.files[0].filePath || '');
 		task.paraArray = getFFmpegParaArray(task.after, true, undefined, undefined, task.outputFile);
 		this.setNotification(id, `任务「${task.fileBaseName}」输入文件上传完成`, NotificationLevel.info);
-		this.emit('taskUpdate', {
-			taskId: id,
-			task: convertAnyTaskToTask(task),
-		});
+		this.emitTaskUpdate(id, task);
 	}
 
 	/**
-	 *  '/
-	 * 【TASK_INITIALIZING / TASK_STOPPED】 => 【TASK_DELETED】
+	 * 【initializing / idle / idle_queued / finished / error】 => 【deleted】
 	 * @param id 任务 id
 	 * @emits tasklistUpdate
 	 */
 	public taskDelete(id: number): void {
 		const task = this.tasklist[id];
-		console.log(getTimeString(new Date()), `删除任务：${task.fileBaseName}。id：${id}。`);
 		if (!task) {
-			throw Error(`任务不存在！任务 id：${id}`);
-		} else if (!task || !([TaskStatus.TASK_INITIALIZING, TaskStatus.TASK_FINISHED, TaskStatus.TASK_STOPPED, TaskStatus.TASK_ERROR].includes(task.status))) {
-			throw Error(`状态机执行异常！任务 id：${id}，操作：删除`);
+			logMsg.error(`[任务 ${id}] 删除：任务不存在！`);
+			return;
 		}
-		task.status = TaskStatus.TASK_DELETED;
+		if (!task || !([TaskStatus.initializing, TaskStatus.idle, TaskStatus.idle_queued, TaskStatus.finished, TaskStatus.error].includes(task.status))) {
+			logMsg.error(`[任务 ${id}] 删除：任务当前状态为 ${task.status}，操作不合法但允许执行！`);
+		} else {
+			logMsg(`[任务 ${id}] 删除任务。`);
+		}
+		task.status = TaskStatus.deleted;
 		delete this.tasklist[id];
 		this.emit('tasklistUpdate', { content: Object.keys(this.tasklist).map(Number) });
 	}
 
 	/**
 	 * 启动单个任务
-	 * 【TASK_STOPPED】 => 【TASK_RUNNING】 => 【TASK_FINISHED / TASK_ERROR】
+	 * 【idle / idle_queued / error】 => 【running】 => 【finished / error】
 	 * @param id 任务 id
 	 * @emits taskUpdate
 	 */
 	public taskStart(id: number): void {
 		const task = this.tasklist[id];
-		console.log(getTimeString(new Date()), `启动任务：${task.fileBaseName}。id：${id}。`);
 		if (!task) {
-			throw Error(`任务不存在！任务 id：${id}`);
-		} else if (!(task.status === TaskStatus.TASK_STOPPED || task.status === TaskStatus.TASK_ERROR)) {
-			throw Error(`状态机执行异常！任务 id：${id}，操作：启动`);
+			logMsg.error(`[任务 ${id}] 启动：任务不存在！`);
+			return;
 		}
-		task.status = TaskStatus.TASK_RUNNING;
+		if (!([TaskStatus.idle, TaskStatus.idle_queued, TaskStatus.error].includes(task.status))) {
+			logMsg.error(`[任务 ${id}] 启动：任务当前状态为 ${task.status}，操作不合法但允许执行！`);
+		} else {
+			logMsg(`[任务 ${id}] 启动。`);
+		}
+		task.status = TaskStatus.running;
 		task.progressLog = {
 			time: [],
 			frame: [],
@@ -274,16 +288,15 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 					this.setNotification(
 						id,
 						`任务「${task.fileBaseName}」设置的视频码率已被限制<br/>` +
-							'💔根据您的用户等级，您在 ABR/CBR 模式下，可以使用的视频码率区间是 500Kbps ~ 32Mbps<br/>' +
-							'😞很抱歉给您带来的不便，您可以到 FFBox 官网寻求解决方案<br/>' +
-							'一般是进行项目捐助，或者下载源码自行编译去除限制，或者直接使用 FFmpeg 进行进阶操作✅',
+							'💔您的用户等级在 ABR/CBR 模式下的视频码率仅支持 500Kbps ~ 32Mbps<br/>' +
+							'✅您可进行软件激活以解锁功能限制，或直接使用 FFmpeg 进行进阶操作',
 						NotificationLevel.warning,
 					);
 					videoParam.ratevalue = ratevalue > 0.75 ? 0.75 : 0.25;
 				}
 			}
 		}
-		const filePath = task.after.input.files[0].filePath!; // 需要上传完成，状态为 TASK_STOPPED 时才能开始任务，因此 filePath 非空
+		// const filePath = task.after.input.files[0].filePath!; // 需要上传完成，状态为 TASK_STOPPED 时才能开始任务，因此 filePath 非空
 		let newFFmpeg: FFmpeg;
 		if (task.remoteTask) {
 			newFFmpeg = new FFmpeg(this.ffmpegPath, 0, getFFmpegParaArray(task.after, false, undefined, undefined, `${os.tmpdir()}/FFBoxDownloadCache/${task.outputFile}`));
@@ -292,16 +305,12 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 			newFFmpeg = new FFmpeg(this.ffmpegPath, 0, getFFmpegParaArray(task.after, false));
 		}
 		newFFmpeg.on('finished', () => {
-			console.log(getTimeString(new Date()), `任务完成：${task.fileBaseName}。id：${id}。`);
-			task.status = TaskStatus.TASK_FINISHED;
+			logMsg(`[任务 ${id}] 完成：${task.fileBaseName}。`);
+			task.status = TaskStatus.finished;
 			task.progressLog.elapsed = new Date().getTime() / 1000 - task.progressLog.lastStarted;
 			this.setNotification(id, `任务「${task.fileBaseName}」已转码完成`, NotificationLevel.ok);
-			this.emit('taskUpdate', {
-				taskId: id,
-				task: convertAnyTaskToTask(task),
-			});
-
-			this.queueAssign(Object.keys(this.tasklist).findIndex((key) => parseInt(key) === id) + 1);
+			this.emitTaskUpdate(id, task);
+			this.queueAssign();
 		});
 		newFFmpeg.on('status', (status: FFmpegProgress) => {
 			const progressLog = task.progressLog;
@@ -332,264 +341,198 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 			this.setNotification(id, task.fileBaseName + '：' + warning.content, NotificationLevel.warning);
 		});
 		newFFmpeg.on('critical', ({ content: errors }) => {
-			console.log(getTimeString(new Date()), `任务出错：${task.fileBaseName}。id：${id}。`);
-			task.status = TaskStatus.TASK_ERROR;
-			this.setNotification(id, '任务「' + task.fileBaseName + '」转码失败。' + [...errors].join('') + '请到任务的命令行输出面板查看详细原因。', NotificationLevel.error);
+			logMsg.error(`[任务 ${id}] 出错：${task.fileBaseName}。`);
+			task.status = TaskStatus.error;
+			this.setNotification(id, '任务「' + task.fileBaseName + '」转码失败。' + [...errors].join('') + '请在命令行输出面板查看详细原因。', NotificationLevel.error);
 			this.emit('taskUpdate', {
 				taskId: id,
 				task: convertAnyTaskToTask(task),
 			});
-			this.queueAssign(Object.keys(this.tasklist).findIndex((key) => parseInt(key) === id) + 1);
+			this.queueAssign();
 		});
 		newFFmpeg.on('escaped', () => {
-			console.log(getTimeString(new Date()), `任务异常终止：${task.fileBaseName}。id：${id}。`);
-			task.status = TaskStatus.TASK_ERROR;
-			this.setNotification(id, '任务「' + task.fileBaseName + '」异常终止。请到任务的命令行输出面板查看详细原因。', NotificationLevel.error);
-			this.emit('taskUpdate', {
-				taskId: id,
-				task: convertAnyTaskToTask(task),
-			});
-			this.queueAssign(Object.keys(this.tasklist).findIndex((key) => parseInt(key) === id) + 1);
+			logMsg.error(`[任务 ${id}] 异常终止：${task.fileBaseName}。`);
+			task.status = TaskStatus.error;
+			this.setNotification(id, '任务「' + task.fileBaseName + '」异常终止。请在命令行输出面板查看详细原因。', NotificationLevel.error);
+			this.emitTaskUpdate(id, task);
+			this.queueAssign();
 		});
 		for (const parameter of ['time', 'frame', 'size']) {
 			const _parameter = parameter as 'time' | 'frame' | 'size';
 			task.progressLog[_parameter].push([new Date().getTime() / 1000 - task.progressLog.lastStarted, 0]);
 		}
 		task.ffmpeg = newFFmpeg;
-		this.emit('taskUpdate', {
-			taskId: id,
-			task: convertAnyTaskToTask(task),
-		});
+		this.emitTaskUpdate(id, task);
 	}
 
 	/**
 	 * 暂停单个任务
-	 * 【TASK_RUNNING】 => 【TASK_PAUSED】
+	 * 【running / paused_queued】 => 【paused】
 	 * @param id 任务 id
-	 * @param startFromBehind 是否继续安排后面未开始的任务，默认为 true
 	 * @emits taskUpdate
 	 */
-	public taskPause(id: number, startFromBehind = true): void {
+	public taskPause(id: number): void {
 		const task = this.tasklist[id];
-		console.log(getTimeString(new Date()), `暂停任务：${task.fileBaseName}。id：${id}。`);
 		if (!task) {
-			throw Error(`任务不存在！任务 id：${id}`);
-		} else if (!(task.status === TaskStatus.TASK_RUNNING || !task.ffmpeg)) {
-			throw Error(`状态机执行异常！任务 id：${id}，操作：暂停`);
+			logMsg.error(`[任务 ${id}] 暂停：任务不存在！`);
+			return;
 		}
-		task.status = TaskStatus.TASK_PAUSED;
+		if (!task.ffmpeg) {
+			// ffmpeg 已退出，不应调用 pause
+			logMsg.error(`[任务 ${id}] 暂停：操作不合法！`);
+			return;
+		}
+		if (!([TaskStatus.running, TaskStatus.paused_queued].includes(task.status))) {
+			logMsg.error(`[任务 ${id}] 暂停：任务当前状态为 ${task.status}，操作不合法但允许执行！`);
+		} else {
+			logMsg(`[任务 ${id}] 暂停。`);
+		}
+		task.status = TaskStatus.paused;
 		task.ffmpeg!.pause();
 		task.progressLog.lastPaused = new Date().getTime() / 1000;
 		task.progressLog.elapsed += task.progressLog.lastPaused - task.progressLog.lastStarted;
-		this.emit('taskUpdate', {
-			taskId: id,
-			task: convertAnyTaskToTask(task),
-		});
-		if (startFromBehind) {
-			this.queueAssign(Object.keys(this.tasklist).findIndex((key) => parseInt(key) === id) + 1);
-		}
+		this.emitTaskUpdate(id, task);
+		this.queueAssign();
 	}
 
 	/**
 	 * 继续执行单个任务
-	 * 【TASK_PAUSED】 => 【TASK_RUNNING】
+	 * 【paused / paused_queued】 => 【running】
 	 * @param id 任务 id
 	 * @emits taskUpdate
 	 */
 	public taskResume(id: number): void {
 		const task = this.tasklist[id];
-		console.log(getTimeString(new Date()), `继续任务：${task.fileBaseName}。id：${id}。`);
 		if (!task) {
-			throw Error(`任务不存在！任务 id：${id}`);
-		} else if (!(task.status === TaskStatus.TASK_PAUSED || !task.ffmpeg)) {
-			throw Error(`状态机执行异常！任务 id：${id}，操作：继续`);
+			logMsg.error(`[任务 ${id}] 继续：任务不存在！`);
+			return;
 		}
-		task.status = TaskStatus.TASK_RUNNING;
+		if (!([TaskStatus.paused, TaskStatus.paused_queued].includes(task.status))) {
+			logMsg.error(`[任务 ${id}] 继续：任务当前状态为 ${task.status}，操作不合法但允许执行！`);
+		} else {
+			logMsg(`[任务 ${id}] 继续。`);
+		}
+		task.status = TaskStatus.running;
 		const nowRealTime = new Date().getTime() / 1000;
 		task.progressLog.lastStarted = nowRealTime;
 		task.ffmpeg!.resume();
-		this.emit('taskUpdate', {
-			taskId: id,
-			task: convertAnyTaskToTask(task),
-		});
+		this.emitTaskUpdate(id, task);
 	}
 
 	/**
 	 * 重置任务（收尾/强行，根据状态决定）
-	 * 【TASK_PAUSED / TASK_STOPPING / TASK_FINISHED / TASK_ERROR】 => 【TASK_STOPPED】
+	 * 【paused / paused_queued / stopping / finished / error】 => 【idle】
 	 * @param id 任务 id
 	 * @emits taskUpdate
 	 */
 	public taskReset(id: number): void {
 		const task = this.tasklist[id];
 		if (!task) {
-			throw Error(`任务不存在！任务 id：${id}`);
-		} else if (
-			!(
-				task.status === TaskStatus.TASK_PAUSED ||
-				task.status === TaskStatus.TASK_RUNNING ||
-				task.status === TaskStatus.TASK_STOPPING ||
-				task.status === TaskStatus.TASK_FINISHED ||
-				task.status === TaskStatus.TASK_ERROR
-			)
-		) {
-			throw Error(`状态机执行异常！任务 id：${id}，操作：重置`);
+			logMsg.error(`[任务 ${id}] 重置：任务不存在！`);
+			return;
 		}
-		// if 语句两个分支的代码重合度很高，区分的原因是因为暂停状态下重置是异步的
-		if (task.status === TaskStatus.TASK_PAUSED || task.status === TaskStatus.TASK_RUNNING) {
+		if ([TaskStatus.paused, TaskStatus.paused_queued, TaskStatus.running].includes(task.status)) {
 			// 暂停状态下重置或运行状态下达到限制停止工作
-			console.log(getTimeString(new Date()), `停止任务：${task.fileBaseName}。id：${id}。`);
-			task.status = TaskStatus.TASK_STOPPING;
+			logMsg(`[任务 ${id}] 重置——软停止。`);
+			task.status = TaskStatus.stopping;
 			task.ffmpeg!.exit(() => {
-				task.status = TaskStatus.TASK_STOPPED;
+				task.status = TaskStatus.idle;
 				task.ffmpeg = null;
 				this.emit('taskUpdate', {
 					taskId: id,
 					task: convertAnyTaskToTask(task),
 				});
-				this.queueCheck();
+				this.queueAssign();
 			});
-		} else if (task.status === TaskStatus.TASK_STOPPING) {
+		} else if (task.status === TaskStatus.stopping) {
 			// 正在停止状态下强制重置
-			console.log(getTimeString(new Date()), `强制停止任务：${task.fileBaseName}。id：${id}。`);
-			task.status = TaskStatus.TASK_STOPPED;
+			logMsg(`[任务 ${id}] 重置——硬停止。`);
+			task.status = TaskStatus.idle;
 			task.ffmpeg!.forceKill(() => {
 				task.ffmpeg = null;
 				this.emit('taskUpdate', {
 					taskId: id,
 					task: convertAnyTaskToTask(task),
 				});
-				this.queueCheck();
+				this.queueAssign();
 			});
-		} else if (task.status === TaskStatus.TASK_FINISHED || task.status === TaskStatus.TASK_ERROR) {
-			// 完成状态下重置
-			console.log(getTimeString(new Date()), `重置任务：${task.fileBaseName}。id：${id}。`);
-			task.status = TaskStatus.TASK_STOPPED;
-		}
-		this.queueCheck();
-		this.emit('taskUpdate', {
-			taskId: id,
-			task: convertAnyTaskToTask(task),
-		});
-	}
-
-	/**
-	 * 向所有客户端更新任务 ID 列表
-	 */
-	private updateTaskList(): void {
-		this.emit('tasklistUpdate', { content: Object.keys(this.tasklist).map(Number) });
-	}
-
-	/**
-	 * 向所有客户端更新单个任务
-	 * @param id 任务 id
-	 */
-	private updateTask(id: number): void {
-		const task = this.tasklist[id];
-		if (!task) {
-			console.warn('尝试读取不存在的任务：' + id);
-			return;
-		}
-		this.emit('taskUpdate', {
-			taskId: id,
-			task: convertAnyTaskToTask(task),
-		});
-	}
-
-	/**
-	 * 获取【正在运行】的任务数
-	 */
-	private getWorkingTaskCount(): number {
-		let count = 0;
-		for (const task of Object.values(this.tasklist)) {
-			if (task.status === TaskStatus.TASK_RUNNING) {
-				count++;
-			}
-		}
-		return count;
-	}
-
-	/**
-	 * 获取【正在运行】、【已暂停】、【正在停止】、【正在结束】的任务数
-	 */
-	private getQueueTaskCount(): number {
-		let count = 0;
-		for (const task of Object.values(this.tasklist)) {
-			if (task.status === TaskStatus.TASK_RUNNING || task.status === TaskStatus.TASK_PAUSED || task.status === TaskStatus.TASK_STOPPING || task.status === TaskStatus.TASK_FINISHING) {
-				count++;
-			}
-		}
-		return count;
-	}
-
-	/**
-	 * workingStatus 的 setter，仅应被 queueAssign 和 queuePause 调用
-	 * @param value WorkingStatus
-	 */
-	private setWorkingStatus(value: WorkingStatus): void {
-		this.workingStatus = value;
-		this.emit('workingStatusUpdate', { value });
-	}
-
-	/**
-	 * 开始处理队列
-	 * @param startFrom
-	 */
-	public queueAssign(startFrom = 0): void {
-		while (this.getWorkingTaskCount() < maxThreads) {
-			let started_thisTime = false;
-			let count = 0;
-			for (const [id, task] of Object.entries(this.tasklist)) {
-				if (id === '-1' || count++ < startFrom) {
-					continue;
-				}
-				if (task.status === TaskStatus.TASK_STOPPED) {
-					// 从还没开始干活的抽一个出来干
-					this.taskStart(parseInt(id));
-					started_thisTime = true;
-					break;
-				} else if (task.status === TaskStatus.TASK_PAUSED) {
-					// 从暂停开始干活的抽一个出来干
-					this.taskResume(parseInt(id));
-					started_thisTime = true;
-					break;
-				}
-			}
-			if (!started_thisTime) {
-				// 遍历完了，没有可以继续开始的任务，停止安排新工作
-				break;
-			}
-		}
-		this.queueCheck();
-	}
-
-	/**
-	 * 检查队列状态，以此更新 workingStatus
-	 */
-	private queueCheck(): void {
-		let newWorkingStatus: WorkingStatus;
-		if (this.getQueueTaskCount() === 0) {
-			// 没有一个待处理任务
-			newWorkingStatus = WorkingStatus.stopped;
-		} else if (this.getWorkingTaskCount() === 0) {
-			// 有待处理任务，但没有开始
-			newWorkingStatus = WorkingStatus.paused;
+		} else if ([TaskStatus.idle_queued, TaskStatus.finished, TaskStatus.error].includes(task.status)) {
+			// 完成状态下或队列中仍未开始状态下重置
+			logMsg(`[任务 ${id}] 重置到初始状态。`);
+			task.status = TaskStatus.idle;
+			this.queueAssign();
 		} else {
-			newWorkingStatus = WorkingStatus.running;
+			logMsg.error(`[任务 ${id}] 重置：任务当前状态为 ${task.status}，操作不合法！`);
 		}
-		if (this.workingStatus !== newWorkingStatus) {
-			this.setWorkingStatus(newWorkingStatus);
+		this.emitTaskUpdate(id, task);
+	}
+
+	/**
+	 * 分配队列任务，每当任务状态更新时都应调用此函数
+	 * 如果当前 workingStatus 为 running，那么挑选处于【空闲_已排队】【已暂停_已排队】的任务进入【正在运行】状态，直到【正在运行】的数量达到最大
+	 * 如果安排完成后【正在运行】的任务数量依然为 0，说明所有任务均已处理完毕，workingStatus 进入 idle 状态
+	 */
+	private queueAssign(): void {
+		if (this.workingStatus === WorkingStatus.running) {
+			let runningCount = Object.values(this.tasklist).reduce((prev, curr) => curr.status === TaskStatus.running ? prev + 1 : prev, 0);
+			for (const [id, task] of Object.entries(this.tasklist)) {
+				if (runningCount >= maxThreads || id === '-1') {
+					break;
+				}
+				if (task.status === TaskStatus.idle_queued) {
+					this.taskStart(+id);
+					runningCount++;
+				}
+				if (task.status === TaskStatus.paused_queued) {
+					this.taskResume(+id);
+					runningCount++;
+				}
+			}
+			if (runningCount === 0) {
+				this.workingStatus = WorkingStatus.idle;
+				this.emit('workingStatusUpdate', { value: this.workingStatus });
+			}
 		}
 	}
 
 	/**
-	 * 暂停处理队列
+	 * 开始处理队列，将所有【空闲】【已暂停】的任务进入【空闲_已排队】【已暂停_已排队】状态，并调用 queueAssign 进行任务安排
+	 */
+	public queueStart(): void {
+		this.workingStatus = WorkingStatus.running;
+		this.emit('workingStatusUpdate', { value: this.workingStatus });
+		for (const [id, task] of Object.entries(this.tasklist)) {
+			if (id === '-1') {
+				continue;
+			}
+			if (task.status === TaskStatus.idle) {
+				task.status = TaskStatus.idle_queued;
+			} else if (task.status === TaskStatus.paused) {
+				task.status = TaskStatus.paused_queued;
+			}
+		}
+		this.queueAssign();
+		for (const id of Object.keys(this.tasklist)) {
+			if (id !== '-1') {
+				this.emitTaskUpdate(+id);
+			}
+		}
+	}
+
+	/**
+	 * 暂停处理队列，将所有【正在运行】的任务暂停、【空闲_已排队】的任务重置
 	 */
 	public queuePause(): void {
-		this.setWorkingStatus(WorkingStatus.paused);
+		this.workingStatus = WorkingStatus.idle;
+		this.emit('workingStatusUpdate', { value: this.workingStatus });
 		for (const [id, task] of Object.entries(this.tasklist)) {
-			if (task.status === TaskStatus.TASK_RUNNING) {
-				this.taskPause(parseInt(id), false);
+			if (id === '-1') {
+				continue;
+			}
+			if (task.status === TaskStatus.running) {
+				this.taskPause(+id);
+			} else if (task.status === TaskStatus.idle_queued) {
+				this.taskReset(+id);
 			}
 		}
 	}
@@ -620,7 +563,7 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 			} else {
 				task.paraArray = getFFmpegParaArray(task.after, true);
 			}
-			this.updateTask(id);
+			this.emitTaskUpdate(id);
 		}
 	}
 
@@ -687,21 +630,20 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 		const task = this.tasklist[id];
 		this.setNotification(
 			id,
-			`任务「${task.fileBaseName}」转码达到时长上限了${byFrontend ? '（前端）' : '（后端）'}💔<br/>` +
-				'FFBox 免费版最大提供 11:11 的媒体时长和 11:11 的处理耗时<br/>' +
-				'您可下载源码自行编译去除限制，或者直接使用 FFmpeg 执行✅<br/>' +
-				'亦可在官网或官方信息发布平台寻求解决方案～',
+			`任务「${task.fileBaseName}」转码达到时长上限了${byFrontend ? '（前端）' : '（后端）'}<br/>` +
+				'💔您的用户等级最高支持 11:11 的媒体时长和 11:11 的处理耗时<br/>' +
+				'✅您可进行软件激活以解锁功能限制，或直接使用 FFmpeg 进行进阶操作',
 			NotificationLevel.error,
 		);
-		task.status = TaskStatus.TASK_STOPPING;
+		task.status = TaskStatus.stopping;
 		task.ffmpeg!.exit(() => {
-			task.status = TaskStatus.TASK_ERROR;
+			task.status = TaskStatus.error;
 			task.ffmpeg = null;
 			this.emit('taskUpdate', {
 				taskId: id,
 				task: convertAnyTaskToTask(task),
 			});
-			this.queueAssign(Object.keys(this.tasklist).findIndex((key) => parseInt(key) === id) + 1);
+			this.queueAssign();
 		});
 	}
 }

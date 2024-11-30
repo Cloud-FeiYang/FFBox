@@ -147,7 +147,6 @@ const onDrop = (event: DragEvent) => {	//
 				:selected="appStore.selectedTask.has(task.id)"
 				:should-handle-hover="true"
 				@click="handleTaskClicked($event, task.id, index)"
-				@pause-or-remove="appStore.pauseNremove(task.id)"
 			/>
 		</div>
 		<div

@@ -22,17 +22,16 @@ export function handleWorkingStatusUpdate(server: Server, workingStatus: Working
         let timerID = setInterval(overallProgressTimer, 80, serverData);
         serverData.overallProgressTimerID = timerID;
         overallProgressTimer(serverData);
-    } else if (workingStatus === WorkingStatus.stopped && serverData.overallProgressTimerID) {
+    } else if (workingStatus === WorkingStatus.idle && serverData.overallProgressTimerID) {
         clearInterval(serverData.overallProgressTimerID);
         serverData.overallProgressTimerID = NaN;
         overallProgressTimer(serverData);
+        const hasUndoneTask = server.data.tasks.some((task) => task.status === TaskStatus.paused);  // 暂停有两种情况：人为暂停时会存在已暂停任务，自动暂停则是所有任务均已完成
         // if (nodeBridge.remote && nodeBridge.remote.getCurrentWindow().isFocused()) {
+        if (!hasUndoneTask) {
             nodeBridge.flashFrame(true);
+        }
         // }
-    } else if (workingStatus === WorkingStatus.paused && serverData.overallProgressTimerID) {
-        clearInterval(serverData.overallProgressTimerID);
-        serverData.overallProgressTimerID = NaN;
-        overallProgressTimer(serverData);
     }
 };
 export function handleTasklistUpdate(server: Server, content: Array<number>) {
@@ -87,7 +86,7 @@ export function handleTaskUpdate(server: Server, id: number, content: Task) {
     const task = mergeTaskFromService(serverData.tasks[id], content);
     serverData.tasks[id] = task;
     // timer 相关处理（开始运行时添加定时器，结束或暂停运行时取消定时器）
-    if (task.status === TaskStatus.TASK_RUNNING && !task.dashboardTimer) {
+    if (task.status === TaskStatus.running && !task.dashboardTimer) {
         task.dashboardTimer = setInterval(dashboardTimer, 50, task) as any;
         if (task.progressLog.time.length <= 1) {
             task.dashboard_smooth = {
@@ -101,15 +100,15 @@ export function handleTaskUpdate(server: Server, id: number, content: Task) {
 				transferSpeed: 0,
 			}
         }
-    } else if (task.dashboardTimer) {
+    } else if (task.status !== TaskStatus.running && task.dashboardTimer) {
         clearInterval(task.dashboardTimer);
         task.dashboardTimer = NaN;
     }
     // 进度条相关处理
-    if (task.status === TaskStatus.TASK_FINISHED || task.status === TaskStatus.TASK_ERROR) {
+    if (task.status === TaskStatus.finished || task.status === TaskStatus.error) {
         task.dashboard.progress = 1;
         task.dashboard_smooth.progress = 1;
-    } else if (task.status === TaskStatus.TASK_STOPPED) {
+    } else if (task.status === TaskStatus.idle) {
         task.dashboard.progress = 0;
         task.dashboard_smooth.progress = 0;
     }
@@ -206,7 +205,7 @@ export function handleCloseConfirm(localServer?: Server) {
     function getQueueTaskCount(server: Server) {
         let count: number = 0;
         for (const task of Object.values(server.data.tasks)) {
-            if (task.status === TaskStatus.TASK_RUNNING || task.status === TaskStatus.TASK_PAUSED || task.status === TaskStatus.TASK_STOPPING || task.status === TaskStatus.TASK_FINISHING) {
+            if (task.status === TaskStatus.running || task.status === TaskStatus.paused || task.status === TaskStatus.stopping || task.status === TaskStatus.finishing) {
                 count++;
             }
         }

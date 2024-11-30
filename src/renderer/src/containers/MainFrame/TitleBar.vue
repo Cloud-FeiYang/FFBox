@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue';
 import { useAppStore } from '@renderer/stores/appStore';
-import { WorkingStatus } from '@common/types';
+import { TaskStatus, WorkingStatus } from '@common/types';
 import nodeBridge from '@renderer/bridges/nodeBridge';
 import IconX from '@renderer/assets/titleBar/×.svg?component';
 
@@ -12,12 +12,15 @@ const serverStyle = computed(() => {
 		[key: string]: {
 			colorStyle: any;
 			text: string;
+			status: 'running' | 'paused' | 'idle';
 		}
 	} = {};
 	for (const server of appStore.servers) {
+		const hasUndoneWork = server.data.tasks.some((task) => [TaskStatus.idle_queued, TaskStatus.paused, TaskStatus.paused_queued, TaskStatus.running, TaskStatus.stopping, TaskStatus.finishing].includes(task.status));
 		const obj = {
-			colorStyle: { width: server.data.workingStatus === WorkingStatus.stopped ? '0%' : `${server.data.progress * 100}%` },
-			text: server.data.name + (server.data.workingStatus === WorkingStatus.stopped ? '' : ` (${(server.data.progress * 100).toFixed(0)}%)`)
+			colorStyle: { width: hasUndoneWork ? `${server.data.progress * 100}%` : '0%' },
+			text: server.data.name + (hasUndoneWork ? ` (${(server.data.progress * 100).toFixed(0)}%)` : ''),
+			status: hasUndoneWork ? (server.data.workingStatus === WorkingStatus.running ? 'running' : 'paused') : 'idle',
 		};
 		map[server.data.id] = obj;
 	}
@@ -27,11 +30,21 @@ const serverStyle = computed(() => {
 watch(
 	[() => appStore.currentServer?.data?.progress, () => appStore.currentServer?.data?.workingStatus],
 	() => {
-		const mode = ['indeterminate', 'normal', 'paused', 'none', 'error'][
-			[NaN, WorkingStatus.running, WorkingStatus.paused, WorkingStatus.stopped].findIndex((value) => value === appStore.currentServer?.data?.workingStatus)
-		] as any;
+		const serverData = appStore.currentServer.data;
+		const hasUndoneWork = serverData.workingStatus === WorkingStatus.running || serverData.tasks.some((task) => [TaskStatus.idle_queued, TaskStatus.paused, TaskStatus.paused_queued, TaskStatus.running, TaskStatus.stopping, TaskStatus.finishing].includes(task.status));
+		const mode = (() => {
+			if (hasUndoneWork) {
+				if (serverData.workingStatus === WorkingStatus.running) {
+					return 'normal';
+				} else {
+					return 'paused';
+				}
+			} else {
+				return 'none';
+			}
+		})();
 		nodeBridge.setProgressBar(
-			appStore.currentServer?.data?.workingStatus !== WorkingStatus.stopped ? appStore.currentServer.data.progress : 0,
+			serverData.progress,
 			{ mode },
 		);
 	}
@@ -61,8 +74,8 @@ const handleTabCloseClicked = (serverId: string, event: MouseEvent) => {
 					@click="handleTabClicked(server.data.id)"
 				>
 					<div class="tab" :class="appStore.currentServerId === server.data.id ? 'selected' : 'unselected'">
-						<div class="progress progress-green" :style="{...serverStyle[server.data.id].colorStyle, opacity: server.data.workingStatus === WorkingStatus.running ? 1 : 0}" />
-						<div class="progress progress-yellow" :style="{...serverStyle[server.data.id].colorStyle, opacity: server.data.workingStatus === WorkingStatus.paused ? 1 : 0}" />
+						<div class="progress progress-green" :style="{...serverStyle[server.data.id].colorStyle, opacity: serverStyle[server.data.id].status === 'running' ? 1 : 0}" />
+						<div class="progress progress-yellow" :style="{...serverStyle[server.data.id].colorStyle, opacity: serverStyle[server.data.id].status === 'paused' ? 1 : 0}" />
 						<span>{{ serverStyle[server.data.id].text }}</span>
 						<div class="close" v-if="server.entity.ip !== 'localhost' && appStore.servers.length > 1" @click="handleTabCloseClicked(server.data.id, $event)">
 							<IconX />

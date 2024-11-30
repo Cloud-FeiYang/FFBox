@@ -311,7 +311,7 @@ export function getInitialTask(fileBaseName: string, outputParams?: OutputParams
 			extra: {},
 		},
 		paraArray: [],
-		status: TaskStatus.TASK_STOPPED,
+		status: TaskStatus.idle,
 		progressLog: {
 			time: [],
 			frame: [],
@@ -462,6 +462,13 @@ export interface TypedEventEmitter<Events> {
 
 export function getTimeString(date: Date, showMs = true): string {
 	return `${date.getFullYear()}-${(date.getMonth() + 1 + '').padStart(2, '0')}-${(date.getDate() + '').padStart(2, '0')} ${(date.getHours() + '').padStart(2, '0')}:${(date.getMinutes() + '').padStart(2, '0')}:${(date.getSeconds() + '').padStart(2, '0')}${showMs ? '.' + (date.getMilliseconds() + '').padStart(3, '0') : ''}`;
+}
+
+export function logMsg(...content: any[]): void {
+	console.log(getTimeString(new Date()), ...content);
+}
+logMsg.error = function (...content: any[]) {
+	console.error(getTimeString(new Date()), ...content);
 }
 
 /**

@@ -19,8 +19,6 @@ interface Props {
 	selected?: boolean;
 	shouldHandleHover?: boolean;	// 如果正在多选，或者单选但选的不是自己，那么不响应悬浮
 	onClick?: (event: MouseEvent) => any;
-	onDblClick?: (event: MouseEvent) => any;
-	onPauseOrRemove?: () => any;
 }
 
 export const TaskItem = defineComponent((props: Props) => {
@@ -209,7 +207,7 @@ export const TaskItem = defineComponent((props: Props) => {
 
 	// #region 其他样式
 
-	const showDashboard = computed(() => [TaskStatus.TASK_RUNNING, TaskStatus.TASK_PAUSED, TaskStatus.TASK_STOPPING].includes(props.task.status) || props.task.transferStatus !== TransferStatus.normal);
+	const showDashboard = computed(() => [TaskStatus.running, TaskStatus.paused, TaskStatus.paused_queued, TaskStatus.stopping, TaskStatus.finishing].includes(props.task.status) || props.task.transferStatus !== TransferStatus.normal);
 	const dashboardType = computed(() => showDashboard ? (props.task.transferStatus !== TransferStatus.normal ? 'transfer' : 'convert') : 'none');
 
 	const taskNameStyle = computed(() => {
@@ -239,11 +237,11 @@ export const TaskItem = defineComponent((props: Props) => {
 
 	const deleteButtonBackgroundPositionX = computed(() => {
 		switch (props.task.status) {
-			case TaskStatus.TASK_STOPPED:
+			case TaskStatus.idle:
 				return '0px';	// 删除按钮
-			case TaskStatus.TASK_RUNNING:
+			case TaskStatus.paused_queued: case TaskStatus.running:
 				return '-100%';	// 暂停按钮
-			case TaskStatus.TASK_PAUSED: case TaskStatus.TASK_STOPPING: case TaskStatus.TASK_FINISHING: case TaskStatus.TASK_FINISHED: case TaskStatus.TASK_ERROR:
+			case TaskStatus.idle_queued: case TaskStatus.paused: case TaskStatus.stopping: case TaskStatus.finishing: case TaskStatus.finished: case TaskStatus.error:
 				return '-200%';	// 重置按钮
 		}
 		return '';
@@ -274,10 +272,10 @@ export const TaskItem = defineComponent((props: Props) => {
 		const taskProgress = (props.task.dashboard_smooth.progress) * 100 + '%';
 		const transferProgress = (props.task.dashboard_smooth.transferred / props.task.transferProgressLog.total) * 100 + '%';
 		return {
-			green: { width: taskProgress, opacity: [TaskStatus.TASK_RUNNING, TaskStatus.TASK_FINISHING].includes(props.task.status) ? 1 : 0},
-			yellow: { width: taskProgress, opacity: [TaskStatus.TASK_PAUSED, TaskStatus.TASK_STOPPING].includes(props.task.status) ? 1 : 0},
-			gray: { width: taskProgress, opacity: [TaskStatus.TASK_FINISHED, TaskStatus.TASK_STOPPED].includes(props.task.status) ? 1 : 0},
-			red: { width: taskProgress, opacity: props.task.status === TaskStatus.TASK_ERROR ? 1 : 0},
+			green: { width: taskProgress, opacity: [TaskStatus.running, TaskStatus.finishing].includes(props.task.status) ? 1 : 0},
+			yellow: { width: taskProgress, opacity: [TaskStatus.paused, TaskStatus.paused_queued, TaskStatus.stopping].includes(props.task.status) ? 1 : 0},
+			gray: { width: taskProgress, opacity: [TaskStatus.finished, TaskStatus.idle].includes(props.task.status) ? 1 : 0},
+			red: { width: taskProgress, opacity: props.task.status === TaskStatus.error ? 1 : 0},
 			blue: { width: transferProgress, opacity: props.task.transferStatus === 'normal' ? 0 : 1 },
 		} as { [key: string]: StyleValue };
 	});
@@ -325,8 +323,10 @@ export const TaskItem = defineComponent((props: Props) => {
 
 	// #endregion
 
+	// #region 操作响应
+
 	const handleTaskMouseEnter = (event: MouseEvent) => {
-		if (props.task.status === TaskStatus.TASK_FINISHED) {
+		if (props.task.status === TaskStatus.finished) {
 			Tooltip.show({
 				content: `双击以${appStore.currentServer.entity.ip === 'localhost' ? '打开' : '下载'}输出文件`,
 				style: {
@@ -340,7 +340,7 @@ export const TaskItem = defineComponent((props: Props) => {
 	const handleTaskDblClicked = (event: MouseEvent) => {
 		const serverName = appStore.currentServer.data.name;
 		const bridge = appStore.currentServer.entity;
-		if (props.task.status === TaskStatus.TASK_FINISHED && props.task.transferStatus === TransferStatus.normal) {
+		if (props.task.status === TaskStatus.finished && props.task.transferStatus === TransferStatus.normal) {
 			if (appStore.currentServer.entity.ip === 'localhost') {
 				nodeBridge.openFile(`"${props.task.outputFile}"`);
 			} else {
@@ -384,6 +384,8 @@ export const TaskItem = defineComponent((props: Props) => {
 		});
 	};
 
+	// #endregion
+
 	return () => (
 		<div class={style.taskWrapper1} onClick={props.onClick}>
 			<div class={style.taskWrapper2}>
@@ -402,7 +404,8 @@ export const TaskItem = defineComponent((props: Props) => {
 					<div class={`${style.backgroundProgress} ${style.progressRed}`} style={taskBackgroundProgressStyle.value.red} />
 					<div class={`${style.backgroundProgress} ${style.progressBlue}`} style={taskBackgroundProgressStyle.value.blue} />
 					<div class={style.previewIcon} style={{ bottom: settings.showCmd ? '66px' : undefined}}>
-						<IconPreview />
+						{/* <IconPreview /> */}
+						<div>{props.task.status}</div>
 					</div>
 					<div
 						class={style.taskName}
@@ -573,7 +576,7 @@ export const TaskItem = defineComponent((props: Props) => {
 						</div>
 					)}
 					<div class={style.vline} style={{ bottom: settings.showCmd ? '66px' : undefined}}><div></div></div>
-					<button aria-label='重置或删除任务' class={style.button} style={{ bottom: settings.showCmd ? '64px' : undefined}} onClick={props.onPauseOrRemove}>
+					<button aria-label='重置或删除任务' class={style.button} style={{ bottom: settings.showCmd ? '64px' : undefined}} onClick={() => appStore.pauseNremove(props.id)}>
 						<div style={{ backgroundPositionX: deleteButtonBackgroundPositionX.value }}></div>
 					</button>
 				</div>
@@ -582,5 +585,5 @@ export const TaskItem = defineComponent((props: Props) => {
 
 	);
 }, {
-	props: ['task', 'id', 'selected', 'shouldHandleHover', 'onClick', 'onDblClick', 'onPauseOrRemove'],
+	props: ['task', 'id', 'selected', 'shouldHandleHover', 'onClick'],
 });

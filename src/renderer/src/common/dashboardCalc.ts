@@ -1,4 +1,4 @@
-import { SingleProgressLog, TransferStatus } from '@common/types';
+import { SingleProgressLog, TaskStatus, TransferStatus } from '@common/types';
 import { parseTimeString } from '@common/utils';
 import { ServerData, UITask } from '@renderer/types'
 
@@ -37,7 +37,8 @@ export function overallProgressTimer(currentServer: ServerData) {
 	let totalTime = 0.000001;
 	let totalProcessedTime = 0;
 	for (const task of Object.values(tasks)) {
-		if (!task.before.duration) {
+		// 排除未在队列的
+		if (!task.before.duration || [TaskStatus.idle].includes(task.status)) {
 			continue;
 		}
 		totalTime += task.before.duration;

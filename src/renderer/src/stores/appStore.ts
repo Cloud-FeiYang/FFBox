@@ -310,8 +310,8 @@ export const useAppStore = defineStore('app', {
 			}
 			const data = 这.currentServer.data;
 			const entity = 这.currentServer.entity;
-			if (data.workingStatus === WorkingStatus.stopped || data.workingStatus === WorkingStatus.paused) {		// 开始任务
-				entity.queueAssign();
+			if (data.workingStatus === WorkingStatus.idle) {		// 开始任务
+				entity.queueStart();
 			} else {
 				entity.queuePause();
 			}
@@ -324,11 +324,11 @@ export const useAppStore = defineStore('app', {
 			const data = 这.currentServer.data;
 			const entity = 这.currentServer.entity;
 			let task = data.tasks[taskId];
-			if (task.status === TaskStatus.TASK_RUNNING) {
+			if ([TaskStatus.running, TaskStatus.paused_queued].includes(task.status)) {
 				entity.taskPause(taskId);
-			} else if (task.status === TaskStatus.TASK_PAUSED || task.status === TaskStatus.TASK_STOPPING || task.status === TaskStatus.TASK_FINISHED || task.status === TaskStatus.TASK_ERROR) {
+			} else if ([TaskStatus.idle_queued, TaskStatus.paused, TaskStatus.stopping, TaskStatus.finished, TaskStatus.error].includes(task.status)) {
 				entity.taskReset(taskId);
-			} else if (task.status === TaskStatus.TASK_STOPPED || task.status === TaskStatus.TASK_INITIALIZING) {
+			} else if (task.status === TaskStatus.idle || task.status === TaskStatus.initializing) {
 				entity.taskDelete(taskId);
 			}
 		},
@@ -546,9 +546,11 @@ export const useAppStore = defineStore('app', {
 			]).then(([versionResponse, propertiesResponse]) => {
 				versionResponse.text().then((text) => {
 					server.data.version = text;
-					if (text !== version) {{
-						Popup({ message: '服务器版本与客户端版本不匹配，可能会导致部分操作异常，请谨慎操作', level: NotificationLevel.warning });
-					}}
+					if (['3.0', '4.0', '4.1', '4.2'].includes(text)) {
+						Popup({ message: `服务器版本 ${text} 与客户端版本 ${version} 不兼容，请更换服务器或客户端`, level: NotificationLevel.warning });
+					} else if (text !== version) {
+						Popup({ message: `服务器版本 ${text} 与客户端版本不匹配，可能会导致部分操作异常，请谨慎操作`, level: NotificationLevel.warning });
+					}
 				});
 				propertiesResponse.json().then((obj) => {
 					server.data.os = obj.os;
@@ -571,7 +573,7 @@ export const useAppStore = defineStore('app', {
 					notifications: [],
 					ffmpegVersion: '',
 					version: '',
-					workingStatus: WorkingStatus.stopped,
+					workingStatus: WorkingStatus.idle,
 					progress: 0,
 					overallProgressTimerID: NaN,
 				},

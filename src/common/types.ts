@@ -2,15 +2,15 @@ import type { FFmpeg } from '@backend/FFmpegInvoke';
 
 export interface FFBoxServiceInterface {
 	initFFmpeg(): void;
-	getFFmpegVersion(): void;
-	taskAdd(fileBaseName: string, outputParams?: OutputParams): Promise<number>;
+	emitFFmpegVersion(): void;
+	taskAdd(taskName: string, outputParams?: OutputParams): Promise<number>;
 	mergeUploaded(id: number, hashs: Array<string>): void;
 	taskDelete(id: number): void;
 	taskStart(id: number): void;
-	taskPause(id: number, startFromBehind?: boolean): void;
+	taskPause(id: number): void;
 	taskResume(id: number): void;
 	taskReset(id: number): void;
-	queueAssign(startFrom?: number): void;
+	queueStart(): void;
 	queuePause(): void;
 	deleteNotification(taskId: number, index: number): void;
 	setParameter(ids: Array<number>, param: OutputParams): void;
@@ -100,15 +100,17 @@ export interface InputFile {
 }
 
 export enum TaskStatus {
-	TASK_DELETED = -2,
-	TASK_INITIALIZING = -1,
-	TASK_STOPPED = 0,
-	TASK_RUNNING = 1,
-	TASK_PAUSED = 2,
-	TASK_STOPPING = 3,
-	TASK_FINISHING = 4,
-	TASK_FINISHED = 5,
-	TASK_ERROR = 6,
+	deleted = 'deleted',
+	initializing = 'initializing',
+	idle = 'idle',
+	idle_queued = 'idle_queued',
+	running = 'running',
+	paused = 'paused',
+	paused_queued = 'paused_queued',
+	stopping = 'stopping',
+	finishing = 'finishing',
+	finished = 'finished',
+	error = 'error',
 }
 
 export enum TransferStatus {
@@ -190,9 +192,8 @@ export interface ServiceTask extends Task {
 }
 
 export enum WorkingStatus {
-	paused = -1,
-	stopped = 0,
-	running = 1,
+	idle = 'idle',
+	running = 'running',
 }
 
 export interface NormalApiWrapper<T> {

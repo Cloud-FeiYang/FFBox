@@ -52,7 +52,7 @@ export class ServiceBridge extends (EventEmitter as new () => TypedEventEmitter<
 			console.log(`serviceBridge: ws://${这.ip}:${这.port}/ 服务器连接成功`, event);
 			这.status = ServiceBridgeStatus.Connected;
 			这.emit('connected');
-			这.getFFmpegVersion();
+			这.emitFFmpegVersion();
 
 			setTimeout(() => {
 				// 这.testSendBigPackage();	// test
@@ -128,9 +128,9 @@ export class ServiceBridge extends (EventEmitter as new () => TypedEventEmitter<
 		this.sendWs(data);
 	}
 
-	public getFFmpegVersion() {
+	public emitFFmpegVersion() {
 		let data: FFBoxServiceFunctionApi = {
-			function: 'getFFmpegVersion',
+			function: 'emitFFmpegVersion',
 			args: [],
 		}
 		this.sendWs(data);
@@ -179,10 +179,10 @@ export class ServiceBridge extends (EventEmitter as new () => TypedEventEmitter<
 		this.sendWs(data);
 	}
 
-	public taskPause(id: number, startFromBehind?: boolean) {
+	public taskPause(id: number) {
 		let data: FFBoxServiceFunctionApi = {
 			function: 'taskPause',
-			args: [id, startFromBehind],
+			args: [id],
 		}
 		this.sendWs(data);
 	}
@@ -203,10 +203,10 @@ export class ServiceBridge extends (EventEmitter as new () => TypedEventEmitter<
 		this.sendWs(data);
 	}
 
-	public queueAssign(startFrom?: number) {
+	public queueStart() {
 		let data: FFBoxServiceFunctionApi = {
-			function: 'queueAssign',
-			args: [startFrom],
+			function: 'queueStart',
+			args: [],
 		}
 		this.sendWs(data);
 	}
