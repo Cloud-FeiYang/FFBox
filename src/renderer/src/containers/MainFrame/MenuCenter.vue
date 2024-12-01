@@ -259,6 +259,7 @@ watch(selectedMenuIndex, (index, oldIndex) => {
 			menu: selectedMenu.subMenu,
 			type: 'action',
 			triggerRect: { xMin: rect.x, yMin: rect.y, xMax: rect.x + rect.width, yMax: rect.y + rect.height },	// 触发菜单的控件的坐标，用于计算菜单弹出方向和大小
+			disableOnClick: true, // 禁用 Menu 组件触发的 onClick，改由此处的 handleMenuItemClicked 进行处理
 			onClose: () => {
 				// 如果是切换菜单（或者是选择了项目触发了 onSelect），此处两值就不相等，则不继续关闭其他内容
 				if (index === selectedMenuIndex.value) {

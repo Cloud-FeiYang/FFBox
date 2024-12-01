@@ -52,10 +52,11 @@
 		display: flex;
 		justify-content: center;
 		align-items: center;
-		font-size: 8px;
 		svg {
-			width: 16px;
-			height: 16px;
+			position: absolute;
+			width: 20px;
+			height: 20px;
+			filter: var(--paraBoxButtonDropFilterSvg);
 		}
 	}
 	.taskName {
@@ -438,6 +439,28 @@
 			}
 		}
 	}
+}
+
+// 状态指示器的动画
+.statusIconAnimation-enter-from {
+	/* z-index: 0; */
+	opacity: 0;
+	transform: translateX(-16px);
+}
+.statusIconAnimation-enter-active, .statusIconAnimation-leave-active {
+	transition: opacity 0.3s, transform 0.5s cubic-bezier(0.2, 1.25, 0.3, 1);
+}
+.statusIconAnimation-enter-to, .statusIconAnimation-leave-from {
+	/* z-index: 1; */
+	opacity: 1;
+	transform: translateX(0);
+}
+.statusIconAnimation-leave-active {
+	transition: opacity 0.3s, transform 0.3s cubic-bezier(0.5, 0, 1, 1);
+}
+.statusIconAnimation-leave-to {
+	opacity: 0;
+	transform: translateX(16px);
 }
 
 // 主题

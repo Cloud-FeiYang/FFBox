@@ -5,11 +5,19 @@ import { generator as vGenerator } from '@common/params/vcodecs';
 import { generator as aGenerator } from '@common/params/acodecs';
 import { useAppStore } from '@renderer/stores/appStore';
 import Tooltip from '@renderer/components/Tooltip/Tooltip';
+import showMenu from '@renderer/components/Menu/Menu';
 import { showProgressInfo } from '@renderer/components/misc/ProgressInfo';
 import nodeBridge from '@renderer/bridges/nodeBridge';
 import { stringifyTimeValue } from '@common/utils';
 import { getOutputDuration } from '@renderer/common/dashboardCalc';
-import IconPreview from '@renderer/assets/video.svg';
+import IconIdle from '@renderer/assets/mainArea/taskStatus/idle.svg';
+import IconIdleQueued from '@renderer/assets/mainArea/taskStatus/idle_queued.svg';
+import IconRunning from '@renderer/assets/mainArea/taskStatus/running.svg';
+import IconPaused from '@renderer/assets/mainArea/taskStatus/paused.svg';
+import IconPausedQueued from '@renderer/assets/mainArea/taskStatus/paused_queued.svg';
+import IconStopping from '@renderer/assets/mainArea/taskStatus/stopping.svg';
+import IconFinished from '@renderer/assets/mainArea/taskStatus/finished.svg';
+import IconError from '@renderer/assets/mainArea/taskStatus/error.svg';
 import IconRightArrow from '@renderer/assets/mainArea/swap_right.svg';
 import style from './TaskItem.module.less';
 
@@ -280,6 +288,30 @@ export const TaskItem = defineComponent((props: Props) => {
 		} as { [key: string]: StyleValue };
 	});
 
+	const taskStatusIcon = computed(() => (
+		[
+			[TaskStatus.idle, <IconIdle />],
+			[TaskStatus.idle_queued, <IconIdleQueued />],
+			[TaskStatus.running, <IconRunning />],
+			[TaskStatus.paused, <IconPaused />],
+			[TaskStatus.paused_queued, <IconPausedQueued />],
+			[TaskStatus.stopping, <IconStopping />],
+			[TaskStatus.finished, <IconFinished />],
+			[TaskStatus.error, <IconError />],
+		].map(([taskStatus, icon]) => (
+			<Transition
+				leaveFromClass={style['statusIconAnimation-leave-from']}
+				leaveToClass={style['statusIconAnimation-leave-to']}
+				leaveActiveClass={style['statusIconAnimation-leave-active']}
+				enterFromClass={style['statusIconAnimation-enter-from']}
+				enterToClass={style['statusIconAnimation-enter-to']}
+				enterActiveClass={style['statusIconAnimation-enter-active']}
+			>
+				{props.task.status === taskStatus ? icon : null}
+			</Transition>
+		))
+	));
+
 	// #endregion
 
 	// #region 体验优化
@@ -358,6 +390,57 @@ export const TaskItem = defineComponent((props: Props) => {
 		}
 	};
 
+	const handleTaskContextMenu = (event: MouseEvent) => {
+		showMenu({
+			menu: [
+				{ type: 'normal', label: props.task.fileBaseName, value: '状态', disabled: true,
+					icon: [<IconIdle />, <IconIdleQueued />, <IconRunning />, <IconPaused />, <IconPausedQueued />, <IconStopping />, <IconFinished />, <IconError />][
+						[TaskStatus.idle, TaskStatus.idle_queued, TaskStatus.running, TaskStatus.paused, TaskStatus.paused_queued, TaskStatus.stopping, TaskStatus.finished, TaskStatus.error].indexOf(props.task.status)
+					],
+					tooltip: ['状态：空闲', '状态：空闲（等待开始）', '状态：运行中', '状态：已暂停', '状态：已暂停（等待恢复）', '状态：正在停止', '状态：已完成', '状态：出错'][
+						[TaskStatus.idle, TaskStatus.idle_queued, TaskStatus.running, TaskStatus.paused, TaskStatus.paused_queued, TaskStatus.stopping, TaskStatus.finished, TaskStatus.error].indexOf(props.task.status)
+					],
+				},
+				{ type: 'separator' },
+				...([TaskStatus.idle, TaskStatus.idle_queued].includes(props.task.status) ? [
+					{ type: 'normal' as any, label: props.task.status === TaskStatus.idle ? '开始转码' : '立即开始转码', value: '开始', onClick: () => { appStore.currentServer.entity.taskStart(props.id) } },
+				] : []),
+				...([TaskStatus.running, TaskStatus.paused_queued].includes(props.task.status) ? [
+					{ type: 'normal', label: props.task.status === TaskStatus.running ? '暂停转码' : '保持暂停', value: '暂停', onClick: () => { appStore.currentServer.entity.taskPause(props.id) } },
+				] : []),
+				...([TaskStatus.paused, TaskStatus.paused_queued, TaskStatus.running].includes(props.task.status) ? [
+					{ type: 'normal', label: '软停止转码', value: '停止', onClick: () => { appStore.currentServer.entity.taskReset(props.id) } },
+				] : []),
+				...([TaskStatus.stopping].includes(props.task.status) ? [
+					{ type: 'normal', label: '硬停止转码', value: '硬停止', onClick: () => { appStore.currentServer.entity.taskReset(props.id) } },
+				] : []),
+				...([TaskStatus.idle_queued, TaskStatus.finished, TaskStatus.error].includes(props.task.status) ? [
+					{ type: 'normal', label: '重置任务', value: '重置', onClick: () => { appStore.currentServer.entity.taskReset(props.id) } },
+				] : []),
+				...([TaskStatus.paused, TaskStatus.paused_queued].includes(props.task.status) ? [
+					{ type: 'normal', label: props.task.status === TaskStatus.paused ? '继续转码' : '立即继续转码', value: '继续', onClick: () => { appStore.currentServer.entity.taskResume(props.id) } },
+				] : []),
+				...([TaskStatus.initializing, TaskStatus.idle, TaskStatus.idle_queued, TaskStatus.finished, TaskStatus.error].includes(props.task.status) ? [
+					{ type: 'normal', label: '删除任务', value: '停止', onClick: () => { appStore.currentServer.entity.taskDelete(props.id) } },
+				] : []),
+			],
+			type: 'action',
+			triggerRect: { xMin: event.pageX - 110, xMax: event.pageX + 110, yMin: event.pageY, yMax: event.pageY },
+		})
+	};
+
+	const handlePauseNremove = () => {
+		const entity = appStore.currentServer.entity;
+		let task = props.task;
+		if ([TaskStatus.running, TaskStatus.paused_queued].includes(task.status)) {
+			entity.taskPause(props.id);
+		} else if ([TaskStatus.idle_queued, TaskStatus.paused, TaskStatus.stopping, TaskStatus.finished, TaskStatus.error].includes(task.status)) {
+			entity.taskReset(props.id);
+		} else if (task.status === TaskStatus.idle || task.status === TaskStatus.initializing) {
+			entity.taskDelete(props.id);
+		}
+	};
+
 	const handleParaAreaMouseEnter = (event: MouseEvent) => {
 		const paramAreaPos = paramAreaRef.value.getBoundingClientRect();
 		const position = window.innerWidth >= 920 ? { right: `${Math.min(window.innerWidth - event.pageX, window.innerWidth - 400)}px`, top: `${paramAreaPos.top}px` } : { right: '48px', top: `${paramAreaPos.top}px` };
@@ -396,16 +479,18 @@ export const TaskItem = defineComponent((props: Props) => {
 					onMouseenter={handleTaskMouseEnter}
 					onMouseleave={() => Tooltip.hide()}
 					onDblclick={handleTaskDblClicked}
+					onContextmenu={handleTaskContextMenu}
 				>
 					<div class={style.backgroundWhite} style={taskBackgroundStyle.value} />
-					<div class={`${style.backgroundProgress} ${style.progressGreen}`} style={taskBackgroundProgressStyle.value.green} />
-					<div class={`${style.backgroundProgress} ${style.progressYellow}`} style={taskBackgroundProgressStyle.value.yellow} />
-					<div class={`${style.backgroundProgress} ${style.progressGray}`} style={taskBackgroundProgressStyle.value.gray} />
-					<div class={`${style.backgroundProgress} ${style.progressRed}`} style={taskBackgroundProgressStyle.value.red} />
-					<div class={`${style.backgroundProgress} ${style.progressBlue}`} style={taskBackgroundProgressStyle.value.blue} />
+					<div>
+						<div class={`${style.backgroundProgress} ${style.progressGreen}`} style={taskBackgroundProgressStyle.value.green} />
+						<div class={`${style.backgroundProgress} ${style.progressYellow}`} style={taskBackgroundProgressStyle.value.yellow} />
+						<div class={`${style.backgroundProgress} ${style.progressGray}`} style={taskBackgroundProgressStyle.value.gray} />
+						<div class={`${style.backgroundProgress} ${style.progressRed}`} style={taskBackgroundProgressStyle.value.red} />
+						<div class={`${style.backgroundProgress} ${style.progressBlue}`} style={taskBackgroundProgressStyle.value.blue} />
+					</div>
 					<div class={style.previewIcon} style={{ bottom: settings.showCmd ? '66px' : undefined}}>
-						{/* <IconPreview /> */}
-						<div>{props.task.status}</div>
+						{taskStatusIcon.value}
 					</div>
 					<div
 						class={style.taskName}
@@ -576,7 +661,7 @@ export const TaskItem = defineComponent((props: Props) => {
 						</div>
 					)}
 					<div class={style.vline} style={{ bottom: settings.showCmd ? '66px' : undefined}}><div></div></div>
-					<button aria-label='重置或删除任务' class={style.button} style={{ bottom: settings.showCmd ? '64px' : undefined}} onClick={() => appStore.pauseNremove(props.id)}>
+					<button aria-label='重置或删除任务' class={style.button} style={{ bottom: settings.showCmd ? '64px' : undefined}} onClick={handlePauseNremove}>
 						<div style={{ backgroundPositionX: deleteButtonBackgroundPositionX.value }}></div>
 					</button>
 				</div>

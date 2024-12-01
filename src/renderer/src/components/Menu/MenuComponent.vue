@@ -15,10 +15,10 @@ interface InnerMenu {
 };
 
 type v_Props = v_MenuOptions & {
-    onClose: () => void;	// 由本组件调用，外部将本组件销毁
+	onSelect?: (event: Event, menuItem: MenuItem) => void | boolean;
 }
 type Props = MenuOptions & {
-    onClose: () => void;	// 由本组件调用，外部将本组件销毁
+	onSelect?: (event: Event, menuItem: MenuItem) => void | boolean;
 }
 
 const props = defineProps<v_Props>() as any as Props;
@@ -275,7 +275,7 @@ const showTooltip = (menuItem: MenuItem) => {
 // 鼠标选择、键盘 Enter，或菜单为 select 模式时键盘移动焦点时均触发此函数，向上层报告
 const handleSelect = (e: MouseEvent | KeyboardEvent, menuItem: MenuItem) => {
 	if ('value' in menuItem) {
-		props.onSelect(e, menuItem.value, menuItem.type !== 'normal' ? menuItem.checked : undefined);
+		props.onSelect(e, menuItem);
 	}
 };
 
@@ -514,6 +514,9 @@ defineExpose({
 						<Checkbox v-if="menuItem.type === 'checkbox'" :checked="menuItem.checked" />
 						<Radio v-if="menuItem.type === 'radio'" :checked="menuItem.checked" />
 					</div>
+					<div v-if="'icon' in menuItem" class="iconArea">
+						<component :is="menuItem.icon" />
+					</div>
 					<div v-if="menuItem.type === 'submenu'" class="iconRightArea">
 						<IconRight :style="openedSubMenuItemPos[menuItem.key]?.preferDirection === 'l' ? { transform: 'rotate(180deg)' } : undefined" />
 					</div>
@@ -588,6 +591,10 @@ defineExpose({
 					display: flex;
 					justify-content: center;
 					align-items: center;
+					/deep/ svg {
+						width: 20px;
+						height: 20px;
+					}
 				}
 				.iconRightArea {
 					position: absolute;

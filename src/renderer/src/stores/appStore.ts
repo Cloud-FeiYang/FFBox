@@ -316,22 +316,6 @@ export const useAppStore = defineStore('app', {
 				entity.queuePause();
 			}
 		},
-		pauseNremove (taskId: number) {
-			const 这 = useAppStore();
-			if (这.currentServer.entity.status !== ServiceBridgeStatus.Connected) {
-				return;
-			}
-			const data = 这.currentServer.data;
-			const entity = 这.currentServer.entity;
-			let task = data.tasks[taskId];
-			if ([TaskStatus.running, TaskStatus.paused_queued].includes(task.status)) {
-				entity.taskPause(taskId);
-			} else if ([TaskStatus.idle_queued, TaskStatus.paused, TaskStatus.stopping, TaskStatus.finished, TaskStatus.error].includes(task.status)) {
-				entity.taskReset(taskId);
-			} else if (task.status === TaskStatus.idle || task.status === TaskStatus.initializing) {
-				entity.taskDelete(taskId);
-			}
-		},
 		// #endregion 任务处理
 		// #region 参数处理
 		/**
