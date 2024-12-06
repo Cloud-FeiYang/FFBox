@@ -524,6 +524,7 @@ export const useAppStore = defineStore('app', {
 		 * 获取 service 的版本和属性更新到本地
 		 */
 		updateServerProperties(server: Server) {
+			const 这 = useAppStore();
 			Promise.all([
 				fetch(`http://${server.entity.ip}:${server.entity.port}/version`, { method: 'get' }),
 				fetch(`http://${server.entity.ip}:${server.entity.port}/properties`, { method: 'get' }),
@@ -540,6 +541,14 @@ export const useAppStore = defineStore('app', {
 					server.data.os = obj.os;
 					server.data.isSandboxed = obj.isSandboxed;
 					server.data.machineId = obj.machineId;
+
+					// 自动激活前端
+					if (server.entity.ip === 'localhost') {
+						nodeBridge.localConfig.get('userInfo.activationCode').then((value) => {
+							const result = 这.activate(value, true);
+							console.log('激活结果', result);
+						});					
+					}
 				});
 			});
 		},
@@ -663,7 +672,7 @@ export const useAppStore = defineStore('app', {
 		},
 		// #endregion 服务器处理
 		// #region 其他
-		async activate(userInput: string, callback: (result: number | false) => any) {
+		activate(userInput: string, frontendOnly = false): number | false {
 			const 这 = useAppStore();
 			if (nodeBridge.env === 'electron') {
 				/**
@@ -671,17 +680,20 @@ export const useAppStore = defineStore('app', {
 				 * 管理端使用这个 key 对 functionLevel 加密，得到的加密字符串由用户输入到 userInput 中去
 				 * 客户端将 userInput 使用 key 解密，如果 userInput 不是瞎编的，那么就能解出正确的 functionLevel
 				 */
-				const machineCode = 这.localServer?.data.machineId ?? '';
+				const machineId = 这.localServer?.data.machineId ?? '';
 				const fixedCode = 'd324c697ebfc42b7';
-				const key = machineCode + fixedCode;
+				const key = machineId + fixedCode;
 				const decrypted = CryptoJS.AES.decrypt(userInput, key)
 				const decryptedString = CryptoJS.enc.Utf8.stringify(decrypted);
 				if (parseInt(decryptedString).toString() === decryptedString) {
 					这.functionLevel = parseInt(decryptedString);
-					这.currentServer.entity.activate(userInput);
-					callback(parseInt(decryptedString))
+					if (!frontendOnly) {
+						这.currentServer.entity.activate(userInput);
+					}
+					nodeBridge.localConfig.set('userInfo.activationCode', userInput);
+					return parseInt(decryptedString);
 				} else {
-					callback(false);
+					return false;
 				}
 			}
 		},

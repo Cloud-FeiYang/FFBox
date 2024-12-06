@@ -408,6 +408,9 @@ export const TaskItem = defineComponent((props: Props) => {
 				...([TaskStatus.running, TaskStatus.paused_queued].includes(props.task.status) ? [
 					{ type: 'normal', label: props.task.status === TaskStatus.running ? '暂停转码' : '保持暂停', value: '暂停', onClick: () => { appStore.currentServer.entity.taskPause(props.id) } },
 				] : []),
+				...([TaskStatus.paused, TaskStatus.paused_queued].includes(props.task.status) ? [
+					{ type: 'normal', label: props.task.status === TaskStatus.paused ? '继续转码' : '立即继续转码', value: '继续', onClick: () => { appStore.currentServer.entity.taskResume(props.id) } },
+				] : []),
 				...([TaskStatus.paused, TaskStatus.paused_queued, TaskStatus.running].includes(props.task.status) ? [
 					{ type: 'normal', label: '软停止转码', value: '停止', onClick: () => { appStore.currentServer.entity.taskReset(props.id) } },
 				] : []),
@@ -416,9 +419,6 @@ export const TaskItem = defineComponent((props: Props) => {
 				] : []),
 				...([TaskStatus.idle_queued, TaskStatus.finished, TaskStatus.error].includes(props.task.status) ? [
 					{ type: 'normal', label: '重置任务', value: '重置', onClick: () => { appStore.currentServer.entity.taskReset(props.id) } },
-				] : []),
-				...([TaskStatus.paused, TaskStatus.paused_queued].includes(props.task.status) ? [
-					{ type: 'normal', label: props.task.status === TaskStatus.paused ? '继续转码' : '立即继续转码', value: '继续', onClick: () => { appStore.currentServer.entity.taskResume(props.id) } },
 				] : []),
 				...([TaskStatus.initializing, TaskStatus.idle, TaskStatus.idle_queued, TaskStatus.finished, TaskStatus.error].includes(props.task.status) ? [
 					{ type: 'normal', label: '删除任务', value: '停止', onClick: () => { appStore.currentServer.entity.taskDelete(props.id) } },

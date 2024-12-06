@@ -46,6 +46,9 @@ async function injectProcessEnv() {
 	console.log(wrapColor('cyan', '注入环境变量信息'), process.env.buildInfo);
 }
 
+/**
+ * 使用 vite 编译后端，并使用 pkg 打包后端（可使用 disable_pkg 来禁用此操作）
+ */
 async function buildBackend() {
 	// const buildProcess = spawn(npmExecutablePath, ['run', 'vite:backend'], { stdio: true ? 'inherit' : 'pipe' });
 	// buildProcess.once('exit', process.exit);
@@ -55,7 +58,9 @@ async function buildBackend() {
 		mode: process.env.NODE_ENV === 'development' ? 'development' : 'production',
 	});
 	const cmdName = process.platform === 'win32' ? 'win' : (process.platform === 'darwin' ? 'mac' : 'linux');
-	const buildProcess = spawnSync(npmExecutablePath, ['run', `pkg:backend:${cmdName}`], { stdio: 'inherit' });
+	if (!process.env.disable_pkg) {
+		const buildProcess = spawnSync(npmExecutablePath, ['run', `pkg:backend:${cmdName}`], { stdio: 'inherit' });
+	}
 	// buildProcess.once('exit', process.exit);
 }
 

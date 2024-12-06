@@ -4,18 +4,7 @@ import { ChildProcess } from 'child_process';
 import parsePath from 'parse-path';
 import { getEnv } from '@common/utils';
 
-// let ElectronStore: typeof _ElectronStore, electronStore: _ElectronStore;
-// let ipcRenderer: IpcRenderer;
-// let spawn: (...args: any) => ChildProcess, exec: (...args: any) => ChildProcess;
-
-// if (getEnv() === 'electron-renderer') {
-// 	ElectronStore = window.require('electron-store');
-// 	ipcRenderer = window.jsb.ipcRenderer as any;
-// 	spawn = window.jsb.spawn;
-// 	exec = window.jsb.exec;
-// }
-
-export default {
+const nodeBridge = {
 	get env(): 'electron' | 'browser' {
 		if (window.jsb) {
 			return 'electron';
@@ -282,5 +271,13 @@ export default {
 
 	readLicense(): Promise<string | undefined> {
 		return window.jsb?.ipcRenderer?.invoke('readLicense');
-	}
+	},
+
+	localConfig: {
+		get(key: string) { return window.jsb?.ipcRenderer?.invoke('localConfig', 'get', key) },
+		set(key: string, value: string) { return window.jsb?.ipcRenderer?.invoke('localConfig', 'set', key, value) },
+		delete(key: string) { return window.jsb?.ipcRenderer?.invoke('localConfig', 'delete', key) },
+	},
 }
+
+export default nodeBridge;

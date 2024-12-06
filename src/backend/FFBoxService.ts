@@ -8,6 +8,7 @@ import { ServiceTask, TaskStatus, OutputParams, FFBoxServiceEvent, Notification,
 import { getFFmpegParaArray, getFFmpegParaArrayOutputPath } from '@common/getFFmpegParaArray';
 import { generator as fGenerator } from '@common/params/formats';
 import { defaultParams } from '@common/defaultParams';
+import localConfig from '@common/localConfig';
 import { getInitialServiceTask, convertAnyTaskToTask, logMsg, TypedEventEmitter, replaceOutputParams, randomString } from '@common/utils';
 import { getMachineId } from './utils';
 import { FFmpeg } from './FFmpegInvoke';
@@ -35,7 +36,7 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 
 	constructor() {
 		super();
-		logMsg('正在初始化 FFBox 服务。');
+		logMsg('正在初始化 FFBox 服务!');
 		this.globalTask = getInitialServiceTask('');
 		this.tasklist[-1] = this.globalTask;
 		setTimeout(() => {
@@ -46,9 +47,14 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 		}, 0);
 	}
 
-	private initActivationInfo() {
+	private async initActivationInfo() {
 		this.machineId = getMachineId();
-		// 暂未支持本地存储激活信息，还需手动激活
+		const activationCode = await localConfig.get('userInfo.activationCode') as string;
+		let result;
+		if (activationCode) {
+			result = this.activate(activationCode);
+		}
+		logMsg(activationCode ? (result ? '已读取激活信息' : '激活信息无效') : '未读取到激活信息');
 	}
 
 	/**
@@ -363,6 +369,10 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 		}
 		task.ffmpeg = newFFmpeg;
 		this.emitTaskUpdate(id, task);
+		if (this.workingStatus === WorkingStatus.idle) {
+			this.workingStatus = WorkingStatus.running;
+			this.emit('workingStatusUpdate', { value: 'start' });
+		}
 	}
 
 	/**
@@ -417,6 +427,10 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 		task.progressLog.lastStarted = nowRealTime;
 		task.ffmpeg!.resume();
 		this.emitTaskUpdate(id, task);
+		if (this.workingStatus === WorkingStatus.idle) {
+			this.workingStatus = WorkingStatus.running;
+			this.emit('workingStatusUpdate', { value: 'start' });
+		}
 	}
 
 	/**
@@ -471,8 +485,9 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 	 * 分配队列任务，每当任务状态更新时都应调用此函数
 	 * 如果当前 workingStatus 为 running，那么挑选处于【空闲_已排队】【已暂停_已排队】的任务进入【正在运行】状态，直到【正在运行】的数量达到最大
 	 * 如果安排完成后【正在运行】的任务数量依然为 0，说明所有任务均已处理完毕，workingStatus 进入 idle 状态
+	 * @returns 当前正在运行的任务数
 	 */
-	private queueAssign(): void {
+	private queueAssign(): number {
 		if (this.workingStatus === WorkingStatus.running) {
 			let runningCount = Object.values(this.tasklist).reduce((prev, curr) => curr.status === TaskStatus.running ? prev + 1 : prev, 0);
 			for (const [id, task] of Object.entries(this.tasklist)) {
@@ -490,9 +505,11 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 			}
 			if (runningCount === 0) {
 				this.workingStatus = WorkingStatus.idle;
-				this.emit('workingStatusUpdate', { value: this.workingStatus });
+				this.emit('workingStatusUpdate', { value: 'stop' });
 			}
+			return runningCount;
 		}
+		return 0;
 	}
 
 	/**
@@ -500,7 +517,6 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 	 */
 	public queueStart(): void {
 		this.workingStatus = WorkingStatus.running;
-		this.emit('workingStatusUpdate', { value: this.workingStatus });
 		for (const [id, task] of Object.entries(this.tasklist)) {
 			if (id === '-1') {
 				continue;
@@ -511,9 +527,12 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 				task.status = TaskStatus.paused_queued;
 			}
 		}
-		this.queueAssign();
-		for (const id of Object.keys(this.tasklist)) {
-			if (id !== '-1') {
+		const runningCount = this.queueAssign();
+		if (runningCount) {
+			this.emit('workingStatusUpdate', { value: 'start' });
+		}
+		for (const [id, task]of Object.entries(this.tasklist)) {
+			if (id !== '-1' && [TaskStatus.idle_queued, TaskStatus.paused_queued].includes(task.status)) {
 				this.emitTaskUpdate(+id);
 			}
 		}
@@ -523,13 +542,15 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 	 * 暂停处理队列，将所有【正在运行】的任务暂停、【空闲_已排队】的任务重置
 	 */
 	public queuePause(): void {
+		if (this.workingStatus === WorkingStatus.running) {
+			this.emit('workingStatusUpdate', { value: 'pause' });
+		}
 		this.workingStatus = WorkingStatus.idle;
-		this.emit('workingStatusUpdate', { value: this.workingStatus });
 		for (const [id, task] of Object.entries(this.tasklist)) {
 			if (id === '-1') {
 				continue;
 			}
-			if (task.status === TaskStatus.running) {
+			if ([TaskStatus.running, TaskStatus.paused_queued].includes(task.status)) {
 				this.taskPause(+id);
 			} else if (task.status === TaskStatus.idle_queued) {
 				this.taskReset(+id);

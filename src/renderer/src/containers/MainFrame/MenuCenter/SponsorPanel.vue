@@ -104,15 +104,14 @@ const handleEnvelopMouseDown = (event: MouseEvent) => {
 		event.preventDefault();
 	} else if (event.button === 0 && envelopNum.value > -1) {
 		// 左键结束计数并激活
-		const machineCode = appStore.localServer?.data.machineId || '';
+		const machineId = appStore.localServer?.data.machineId || '';
 		const fixedCode = 'd324c697ebfc42b7';
-		const key = machineCode + fixedCode;
+		const key = machineId + fixedCode;
 		const min = CryptoJS.enc.Utf8.parse(envelopNum.value + '');
 		const userInput = CryptoJS.AES.encrypt(min, key).toString();
-		appStore.activate(userInput, (result: number | false) => {
-			console.log('激活结果：' + result);
-			Popup({ message: '激活结果请到开发人员控制台查看', level: NotificationLevel.ok });
-		});
+		const result = appStore.activate(userInput);
+		console.log('激活结果：' + result);
+		Popup({ message: '激活结果请到开发人员控制台查看', level: NotificationLevel.ok });
 		envelopNum.value = -2;
 	} else {
 		// 其他情况一律结束计数
@@ -122,14 +121,13 @@ const handleEnvelopMouseDown = (event: MouseEvent) => {
 
 const handleActivateButtonClick = () => {
 	if (activateCode.value.length) {
-		appStore.activate(activateCode.value, (result) => {
-			console.log('激活结果：' + result);
-			if (result) {
-				Popup({ message: '🎉成功了！你人真好👍', level: NotificationLevel.ok });
-			} else {
-				Popup({ message: '没成呢🤷', level: NotificationLevel.warning });
-			}
-		});
+		const result = appStore.activate(activateCode.value);
+		console.log('激活结果：' + result);
+		if (result) {
+			Popup({ message: '🎉成功了！你人真好👍', level: NotificationLevel.ok });
+		} else {
+			Popup({ message: '没成呢🤷', level: NotificationLevel.warning });
+		}
 	} else {
 		Popup({ message: '这不还没写激活码嘛~🤷', level: NotificationLevel.info });
 	}

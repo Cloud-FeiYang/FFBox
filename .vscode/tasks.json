@@ -9,6 +9,7 @@
 			"options": {
 				"env": {
 					"NODE_ENV": "development",
+					"disable_pkg": "true",
 				}
 			}
 		},

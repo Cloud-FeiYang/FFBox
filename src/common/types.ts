@@ -20,7 +20,7 @@ export interface FFBoxServiceInterface {
 
 export interface FFBoxServiceEventParam {
 	ffmpegVersion: { content: string };
-	workingStatusUpdate: { value: WorkingStatus };
+	workingStatusUpdate: { value: 'start' | 'stop' | 'pause' };	// 此处不使用 WorkingStatus 的原因是：任务列表与任务状态是通过两个消息传送的，到达顺序不可保证，因此需要由后端告知工作状态停止是暂停还是停止，否则前端无法判断
 	tasklistUpdate: { content: number[] };
 	taskUpdate: { taskId: number; task: Task };
 	cmdUpdate: { taskId: number; content: string; append: boolean };	// 由 append 确定是增量还是全量更新

@@ -7,6 +7,7 @@ import CryptoJS from 'crypto-js';
 import fs from 'fs/promises';
 import { TransferStatus } from '@common/types';
 import ProcessInstance from '@common/processInstance';
+import localConfig from '@common/localConfig';
 import { convertFFBoxMenuToElectronMenuTemplate, getOs } from './utils';
 import osBridge from './osBridge';
 import * as mica from './mica';
@@ -456,15 +457,16 @@ class ElectronApp {
 			}
 		});
 
-		// ipcMain.handle('electron-store', (event, type: 'get' | 'set' | 'delete', key: string, value?: string) => {
-		// 	if (type === 'get') {
-		// 		return this.electronStore.get(key);
-		// 	} else if (type === 'set') {
-		// 		return this.electronStore.set(key, value);
-		// 	} else {
-		// 		return this.electronStore.delete(key);
-		// 	}
-		// });
+		// 原 electron-store 功能
+		ipcMain.handle('localConfig', (event, type: 'get' | 'set' | 'delete', key: string, value?: string) => {
+			if (type === 'get') {
+				return localConfig.get(key);
+			} else if (type === 'set') {
+				return localConfig.set(key, value);
+			} else {
+				return localConfig.delete(key);
+			}
+		});
 	}
 }
 

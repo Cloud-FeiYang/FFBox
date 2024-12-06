@@ -14,21 +14,20 @@ import { ButtonType } from "@renderer/components/Button/Button";
 export function handleFFmpegVersion(server: Server, content: string) {
     server.data.ffmpegVersion = content || '-';
 };
-export function handleWorkingStatusUpdate(server: Server, workingStatus: WorkingStatus) {
+export function handleWorkingStatusUpdate(server: Server, workingStatus: "start" | "stop" | "pause") {
     const serverData = server.data;
-    serverData.workingStatus = workingStatus;
+    serverData.workingStatus = workingStatus === 'start' ? WorkingStatus.running : WorkingStatus.idle;
     // 处理 overallProgressTimer
-    if (workingStatus === WorkingStatus.running && !serverData.overallProgressTimerID) {
+    if (serverData.workingStatus === WorkingStatus.running && !serverData.overallProgressTimerID) {
         let timerID = setInterval(overallProgressTimer, 80, serverData);
         serverData.overallProgressTimerID = timerID;
         overallProgressTimer(serverData);
-    } else if (workingStatus === WorkingStatus.idle && serverData.overallProgressTimerID) {
+    } else if (serverData.workingStatus === WorkingStatus.idle && serverData.overallProgressTimerID) {
         clearInterval(serverData.overallProgressTimerID);
         serverData.overallProgressTimerID = NaN;
         overallProgressTimer(serverData);
-        const hasUndoneTask = server.data.tasks.some((task) => task.status === TaskStatus.paused);  // 暂停有两种情况：人为暂停时会存在已暂停任务，自动暂停则是所有任务均已完成
         // if (nodeBridge.remote && nodeBridge.remote.getCurrentWindow().isFocused()) {
-        if (!hasUndoneTask) {
+        if (workingStatus === 'stop') {
             nodeBridge.flashFrame(true);
         }
         // }
