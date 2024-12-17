@@ -1,4 +1,5 @@
 import { execSync } from 'child_process';
+import { getSingleArgvValue, logMsg } from '@common/utils';
 
 export function getOs() {
 	let platform : NodeJS.Platform = process.platform;
@@ -55,5 +56,23 @@ export function getMachineId() {
 		return extract(execResult);
 	} catch (error) {
 		return undefined;		
+	}
+}
+
+const loglevel = +(getSingleArgvValue('--loglevel') || 5);
+export function log() {}
+log.error = function (...content: any) {
+	if (loglevel >= 3) {
+		logMsg.error(...content);
+	}
+}
+log.info = function (...content: any) {
+	if (loglevel >= 5) {
+		logMsg(...content);
+	}
+}
+log.dev = function (...content: any) {
+	if (loglevel >= 6) {
+		logMsg(...content);
 	}
 }

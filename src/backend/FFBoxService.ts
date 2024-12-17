@@ -9,12 +9,10 @@ import { getFFmpegParaArray, getFFmpegParaArrayOutputPath } from '@common/getFFm
 import { generator as fGenerator } from '@common/params/formats';
 import { defaultParams } from '@common/defaultParams';
 import localConfig from '@common/localConfig';
-import { getInitialServiceTask, convertAnyTaskToTask, logMsg, TypedEventEmitter, replaceOutputParams, randomString } from '@common/utils';
-import { getMachineId } from './utils';
+import { getInitialServiceTask, convertAnyTaskToTask, TypedEventEmitter, replaceOutputParams, randomString } from '@common/utils';
+import { getMachineId, log } from './utils';
 import { FFmpeg } from './FFmpegInvoke';
 import UIBridge from './uiBridge';
-
-const maxThreads = 2;
 
 export interface FFBoxServerEvent {
 	serverReady: () => void;
@@ -26,8 +24,10 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 	public tasklist: ServiceTask[] = [];
 	private latestTaskId = 0;
 	private workingStatus: WorkingStatus = WorkingStatus.idle;
+	private maxThreads = 1;
 	private ffmpegVersion = '';
 	private ffmpegPath = 'ffmpeg';
+	private customFFmpegPath: string;
 	private globalTask: ServiceTask;
 	public notifications: Notification[] = [];
 	private latestNotificationId = 0;
@@ -36,14 +36,14 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 
 	constructor() {
 		super();
-		logMsg('正在初始化 FFBox 服务!');
+		log.info('正在初始化 FFBox 服务。');
 		this.globalTask = getInitialServiceTask('');
 		this.tasklist[-1] = this.globalTask;
-		setTimeout(() => {
+		setTimeout(async () => {
 			this.initActivationInfo();
-			this.initSettings();
 			this.initUIBridge();
-			this.initFFmpeg();
+			await this.initSettings();
+			// this.initFFmpeg();	// 在 initSetting 中已调用
 		}, 0);
 	}
 
@@ -54,14 +54,23 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 		if (activationCode) {
 			result = this.activate(activationCode);
 		}
-		logMsg(activationCode ? (result ? '已读取激活信息' : '激活信息无效') : '未读取到激活信息');
+		log.info(activationCode ? (result ? '已读取激活信息' : '激活信息无效') : '未读取到激活信息');
 	}
 
 	/**
 	 * 从本地存储初始化设置
 	 */
-	private initSettings(): void {
+	public async initSettings(): Promise<void> {
 		this.globalTask.after = defaultParams;
+		const currentMaxThreads = (await localConfig.get('service.maxThreads') as number) || 1;
+		this.maxThreads = currentMaxThreads;
+		log.info(`设定最大同时运行任务数为 ${this.maxThreads}`);
+		const customFFmpegPath = await localConfig.get('service.customFFmpegPath');
+		if (this.customFFmpegPath !== customFFmpegPath) {
+			this.customFFmpegPath = customFFmpegPath as any || undefined;
+			this.initFFmpeg();
+		}
+		this.customFFmpegPath = customFFmpegPath as any || undefined;
 	}
 
 	/**
@@ -77,26 +86,34 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 	 * @emits ffmpegVersion
 	 */
 	public async initFFmpeg(): Promise<void> {
-		logMsg('检查 FFmpeg 路径和版本。');
-		if (process.platform === 'darwin') {
-			await fsPromise.access(path.join(process.execPath, '../ffmpeg'), fs.constants.X_OK).then((result) => {
-				this.ffmpegPath = path.join(process.execPath, '../ffmpeg'); // 【程序目录】沙箱运行模式，service 与 ffmpeg 处在同一层级
-			}).catch(() => {});
-			await fsPromise.access('/usr/local/bin/ffmpeg', fs.constants.X_OK).then((result) => {
-				this.ffmpegPath = '/usr/local/bin/ffmpeg'; // 【系统目录】macOS 只允许用户往 /usr/local/bin/ 放东西（而不能是 /usr/bin/），且此种情况下需要完整路径才能引用
-			}).catch(() => {});
-		}
-		if (process.platform === 'linux') {
-			await fsPromise.access(path.join(process.execPath, '../ffmpeg'), fs.constants.X_OK).then((result) => {
-				// 【程序目录】deb 沙箱运行模式。service 与 ffmpeg 处在同一目录（/opt/FFBox/）
-				this.ffmpegPath = path.join(process.execPath, '../ffmpeg');
-			}).catch(() => {});
-			await fsPromise.access(path.join(process.cwd(), 'ffmpeg'), fs.constants.X_OK).then((result) => {
-				this.ffmpegPath = path.join(process.cwd(), 'ffmpeg'); // 【程序目录】AppImage 沙箱运行模式，读取 .AppImage 同级目录
-			}).catch(() => {});
-			// 【系统目录】Linux 下 /usr/local/bin/ 和 /usr/bin/ 里的东西均能被直接引用，包括终端执行和沙箱执行，因此此处不需要进行处理
-			// console.log('路径', process.execPath, process.cwd(), __dirname, this.ffmpegPath);
-			// this.ffmpegVersion = `路径 ${process.execPath}, ${process.cwd()}, ${__dirname}, ${this.ffmpegPath}`;
+		if (this.customFFmpegPath) {
+			log.info(`已手动指定 ffmpeg 路径为 ${this.customFFmpegPath}，检查版本。`);
+			this.ffmpegPath = this.customFFmpegPath;
+		} else {
+			log.info('检查 FFmpeg 路径和版本。');
+			if (process.platform === 'win32') {
+				this.ffmpegPath = 'ffmpeg';
+			}
+			if (process.platform === 'darwin') {
+				await fsPromise.access(path.join(process.execPath, '../ffmpeg'), fs.constants.X_OK).then((result) => {
+					this.ffmpegPath = path.join(process.execPath, '../ffmpeg'); // 【程序目录】沙箱运行模式，service 与 ffmpeg 处在同一层级
+				}).catch(() => {});
+				await fsPromise.access('/usr/local/bin/ffmpeg', fs.constants.X_OK).then((result) => {
+					this.ffmpegPath = '/usr/local/bin/ffmpeg'; // 【系统目录】macOS 只允许用户往 /usr/local/bin/ 放东西（而不能是 /usr/bin/），且此种情况下需要完整路径才能引用
+				}).catch(() => {});
+			}
+			if (process.platform === 'linux') {
+				await fsPromise.access(path.join(process.execPath, '../ffmpeg'), fs.constants.X_OK).then((result) => {
+					// 【程序目录】deb 沙箱运行模式。service 与 ffmpeg 处在同一目录（/opt/FFBox/）
+					this.ffmpegPath = path.join(process.execPath, '../ffmpeg');
+				}).catch(() => {});
+				await fsPromise.access(path.join(process.cwd(), 'ffmpeg'), fs.constants.X_OK).then((result) => {
+					this.ffmpegPath = path.join(process.cwd(), 'ffmpeg'); // 【程序目录】AppImage 沙箱运行模式，读取 .AppImage 同级目录
+				}).catch(() => {});
+				// 【系统目录】Linux 下 /usr/local/bin/ 和 /usr/bin/ 里的东西均能被直接引用，包括终端执行和沙箱执行，因此此处不需要进行处理
+				// console.log('路径', process.execPath, process.cwd(), __dirname, this.ffmpegPath);
+				// this.ffmpegVersion = `路径 ${process.execPath}, ${process.cwd()}, ${__dirname}, ${this.ffmpegPath}`;
+			}
 		}
 		const ffmpeg = new FFmpeg(this.ffmpegPath, 1);
 		ffmpeg.on('data', ({ content }) => {
@@ -108,7 +125,7 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 			} else {
 				this.ffmpegVersion = '';
 			}
-			logMsg('FFmpeg 路径和版本检查完毕。', this.ffmpegPath, this.ffmpegVersion);
+			log.info('FFmpeg 路径和版本检查完毕。', this.ffmpegPath, this.ffmpegVersion);
 			this.emitFFmpegVersion();
 		});
 	}
@@ -144,7 +161,7 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 		const id = this.latestTaskId++;
 		// 目前只处理单输入的情况
 		const filePath = outputParams.input.files[0].filePath;
-		logMsg(`[任务 ${id}] 新增任务：${taskName}（${filePath ? '本地' : '网络'}）。`);
+		log.info(`[任务 ${id}] 新增任务：${taskName}（${filePath ? '本地' : '网络'}）。`);
 		const task = getInitialServiceTask(taskName, outputParams);
 		this.tasklist[id] = task;
 
@@ -172,7 +189,7 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 	 */
 	private getFileMetadata(id: number, task: ServiceTask, filePath: string): void {
 		// FFmpeg 读取媒体信息
-		logMsg(`[任务 ${id}] 读取输入媒体信息。`);
+		log.info(`[任务 ${id}] 读取输入媒体信息。`);
 		const ffmpeg = new FFmpeg(this.ffmpegPath, 2, ['-hide_banner', '-i', filePath, '-f', 'null']);
 		ffmpeg.on('data', ({ content }) => {
 			this.setCmdText(id, content);
@@ -242,13 +259,13 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 	public taskDelete(id: number): void {
 		const task = this.tasklist[id];
 		if (!task) {
-			logMsg.error(`[任务 ${id}] 删除：任务不存在！`);
+			log.error(`[任务 ${id}] 删除：任务不存在！`);
 			return;
 		}
 		if (!task || !([TaskStatus.initializing, TaskStatus.idle, TaskStatus.idle_queued, TaskStatus.finished, TaskStatus.error].includes(task.status))) {
-			logMsg.error(`[任务 ${id}] 删除：任务当前状态为 ${task.status}，操作不合法但允许执行！`);
+			log.error(`[任务 ${id}] 删除：任务当前状态为 ${task.status}，操作不合法但允许执行！`);
 		} else {
-			logMsg(`[任务 ${id}] 删除任务。`);
+			log.info(`[任务 ${id}] 删除任务。`);
 		}
 		task.status = TaskStatus.deleted;
 		delete this.tasklist[id];
@@ -264,13 +281,13 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 	public taskStart(id: number): void {
 		const task = this.tasklist[id];
 		if (!task) {
-			logMsg.error(`[任务 ${id}] 启动：任务不存在！`);
+			log.error(`[任务 ${id}] 启动：任务不存在！`);
 			return;
 		}
 		if (!([TaskStatus.idle, TaskStatus.idle_queued, TaskStatus.error].includes(task.status))) {
-			logMsg.error(`[任务 ${id}] 启动：任务当前状态为 ${task.status}，操作不合法但允许执行！`);
+			log.error(`[任务 ${id}] 启动：任务当前状态为 ${task.status}，操作不合法但允许执行！`);
 		} else {
-			logMsg(`[任务 ${id}] 启动。`);
+			log.info(`[任务 ${id}] 启动。`);
 		}
 		task.status = TaskStatus.running;
 		task.progressLog = {
@@ -311,7 +328,7 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 			newFFmpeg = new FFmpeg(this.ffmpegPath, 0, getFFmpegParaArray(task.after, false));
 		}
 		newFFmpeg.on('finished', () => {
-			logMsg(`[任务 ${id}] 完成：${task.fileBaseName}。`);
+			log.info(`[任务 ${id}] 完成：${task.fileBaseName}。`);
 			task.status = TaskStatus.finished;
 			task.progressLog.elapsed = new Date().getTime() / 1000 - task.progressLog.lastStarted;
 			this.setNotification(id, `任务「${task.fileBaseName}」已转码完成`, NotificationLevel.ok);
@@ -347,7 +364,7 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 			this.setNotification(id, task.fileBaseName + '：' + warning.content, NotificationLevel.warning);
 		});
 		newFFmpeg.on('critical', ({ content: errors }) => {
-			logMsg.error(`[任务 ${id}] 出错：${task.fileBaseName}。`);
+			log.error(`[任务 ${id}] 出错：${task.fileBaseName}。`);
 			task.status = TaskStatus.error;
 			this.setNotification(id, '任务「' + task.fileBaseName + '」转码失败。' + [...errors].join('') + '请在命令行输出面板查看详细原因。', NotificationLevel.error);
 			this.emit('taskUpdate', {
@@ -357,7 +374,7 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 			this.queueAssign();
 		});
 		newFFmpeg.on('escaped', () => {
-			logMsg.error(`[任务 ${id}] 异常终止：${task.fileBaseName}。`);
+			log.error(`[任务 ${id}] 异常终止：${task.fileBaseName}。`);
 			task.status = TaskStatus.error;
 			this.setNotification(id, '任务「' + task.fileBaseName + '」异常终止。请在命令行输出面板查看详细原因。', NotificationLevel.error);
 			this.emitTaskUpdate(id, task);
@@ -384,18 +401,18 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 	public taskPause(id: number): void {
 		const task = this.tasklist[id];
 		if (!task) {
-			logMsg.error(`[任务 ${id}] 暂停：任务不存在！`);
+			log.error(`[任务 ${id}] 暂停：任务不存在！`);
 			return;
 		}
 		if (!task.ffmpeg) {
 			// ffmpeg 已退出，不应调用 pause
-			logMsg.error(`[任务 ${id}] 暂停：操作不合法！`);
+			log.error(`[任务 ${id}] 暂停：操作不合法！`);
 			return;
 		}
 		if (!([TaskStatus.running, TaskStatus.paused_queued].includes(task.status))) {
-			logMsg.error(`[任务 ${id}] 暂停：任务当前状态为 ${task.status}，操作不合法但允许执行！`);
+			log.error(`[任务 ${id}] 暂停：任务当前状态为 ${task.status}，操作不合法但允许执行！`);
 		} else {
-			logMsg(`[任务 ${id}] 暂停。`);
+			log.info(`[任务 ${id}] 暂停。`);
 		}
 		task.status = TaskStatus.paused;
 		task.ffmpeg!.pause();
@@ -414,13 +431,13 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 	public taskResume(id: number): void {
 		const task = this.tasklist[id];
 		if (!task) {
-			logMsg.error(`[任务 ${id}] 继续：任务不存在！`);
+			log.error(`[任务 ${id}] 继续：任务不存在！`);
 			return;
 		}
 		if (!([TaskStatus.paused, TaskStatus.paused_queued].includes(task.status))) {
-			logMsg.error(`[任务 ${id}] 继续：任务当前状态为 ${task.status}，操作不合法但允许执行！`);
+			log.error(`[任务 ${id}] 继续：任务当前状态为 ${task.status}，操作不合法但允许执行！`);
 		} else {
-			logMsg(`[任务 ${id}] 继续。`);
+			log.info(`[任务 ${id}] 继续。`);
 		}
 		task.status = TaskStatus.running;
 		const nowRealTime = new Date().getTime() / 1000;
@@ -442,12 +459,12 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 	public taskReset(id: number): void {
 		const task = this.tasklist[id];
 		if (!task) {
-			logMsg.error(`[任务 ${id}] 重置：任务不存在！`);
+			log.error(`[任务 ${id}] 重置：任务不存在！`);
 			return;
 		}
 		if ([TaskStatus.paused, TaskStatus.paused_queued, TaskStatus.running].includes(task.status)) {
 			// 暂停状态下重置或运行状态下达到限制停止工作
-			logMsg(`[任务 ${id}] 重置——软停止。`);
+			log.info(`[任务 ${id}] 重置——软停止。`);
 			task.status = TaskStatus.stopping;
 			task.ffmpeg!.exit(() => {
 				task.status = TaskStatus.idle;
@@ -460,7 +477,7 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 			});
 		} else if (task.status === TaskStatus.stopping) {
 			// 正在停止状态下强制重置
-			logMsg(`[任务 ${id}] 重置——硬停止。`);
+			log.info(`[任务 ${id}] 重置——硬停止。`);
 			task.status = TaskStatus.idle;
 			task.ffmpeg!.forceKill(() => {
 				task.ffmpeg = null;
@@ -472,11 +489,11 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 			});
 		} else if ([TaskStatus.idle_queued, TaskStatus.finished, TaskStatus.error].includes(task.status)) {
 			// 完成状态下或队列中仍未开始状态下重置
-			logMsg(`[任务 ${id}] 重置到初始状态。`);
+			log.info(`[任务 ${id}] 重置到初始状态。`);
 			task.status = TaskStatus.idle;
 			this.queueAssign();
 		} else {
-			logMsg.error(`[任务 ${id}] 重置：任务当前状态为 ${task.status}，操作不合法！`);
+			log.error(`[任务 ${id}] 重置：任务当前状态为 ${task.status}，操作不合法！`);
 		}
 		this.emitTaskUpdate(id, task);
 	}
@@ -491,7 +508,7 @@ export class FFBoxService extends (EventEmitter as new () => TypedEventEmitter<F
 		if (this.workingStatus === WorkingStatus.running) {
 			let runningCount = Object.values(this.tasklist).reduce((prev, curr) => curr.status === TaskStatus.running ? prev + 1 : prev, 0);
 			for (const [id, task] of Object.entries(this.tasklist)) {
-				if (runningCount >= maxThreads || id === '-1') {
+				if (runningCount >= this.maxThreads || id === '-1') {
 					break;
 				}
 				if (task.status === TaskStatus.idle_queued) {

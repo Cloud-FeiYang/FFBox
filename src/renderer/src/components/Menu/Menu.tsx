@@ -82,7 +82,7 @@ const showMenu = function (options?: MenuOptions) {
 			}
 		}
 		needToTriggerOnclick = needToTriggerOnclick && !options.disableOnClick;
-		if (needToTriggerOnclick) {
+		if (needToTriggerOnclick && !menuItem.disabled) {
 			(menuItem.onClick || (() => {}))(event, menuItem.value);
 		}
 		if (needToClose) {

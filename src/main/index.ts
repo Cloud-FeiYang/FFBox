@@ -458,7 +458,7 @@ class ElectronApp {
 		});
 
 		// 原 electron-store 功能
-		ipcMain.handle('localConfig', (event, type: 'get' | 'set' | 'delete', key: string, value?: string) => {
+		ipcMain.handle('localConfig', (event, type: 'get' | 'set' | 'delete', key: string, value?: any) => {
 			if (type === 'get') {
 				return localConfig.get(key);
 			} else if (type === 'set') {

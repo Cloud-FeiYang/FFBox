@@ -2,7 +2,11 @@
 import { computed, watch } from 'vue';
 import { useAppStore } from '@renderer/stores/appStore';
 import { TaskStatus, WorkingStatus } from '@common/types';
+import { Server } from '@renderer/types';
 import nodeBridge from '@renderer/bridges/nodeBridge';
+import showMenu from '@renderer/components/Menu/Menu';
+import { ServiceBridgeStatus } from '@renderer/bridges/serviceBridge';
+import { showServerConfig } from '@renderer/components/misc/ServerConfig';
 import IconX from '@renderer/assets/titleBar/×.svg?component';
 
 const appStore = useAppStore();
@@ -55,6 +59,35 @@ const handleTabClicked = (serverId: string) => {
 	appStore.currentServerId = serverId;
 };
 
+const handleTabContextMenu = (event: MouseEvent, server: Server) => {
+	let tabElem = event.target;
+	while (tabElem.className.includes('tab')) {
+		tabElem = tabElem.parentElement;
+	}
+	const rect = tabElem.getBoundingClientRect();
+	showMenu({
+		menu: [
+			...(server.entity.status === ServiceBridgeStatus.Idle ? [
+				{ type: 'normal', label: '未连接', value: '未连接', disabled: true },
+			] : []),
+			...(server.entity.status !== ServiceBridgeStatus.Idle ? [
+				{ type: 'normal', label: `${server.entity.ip}:${server.entity.port}`, value: 'ipport', disabled: true },
+			] : []),
+			...(server.entity.ip !== 'localhost' && appStore.servers.length > 1 ? [
+				{ type: 'separator' },
+				{ type: 'normal', label: server.entity.status === ServiceBridgeStatus.Idle ? '关闭' : '断开连接并关闭', value: '断开连接并关闭', onClick: () => handleTabCloseClicked(server.data.id, event) },
+			] : []),
+			...(server.entity.ip === 'localhost' ? [
+				{ type: 'separator' },
+				{ type: 'normal', label: '服务器配置', value: '服务器配置', disabled: server.entity.status !== ServiceBridgeStatus.Connected, onClick: () => showServerConfig(server.data.id) },
+			] : []),
+		],
+		type: 'action',
+		// triggerRect: { xMin: event.pageX - 110, xMax: event.pageX + 110, yMin: event.pageY, yMax: event.pageY },
+		triggerRect: { xMin: rect.x, xMax: rect.x + rect.width, yMin: event.y, yMax: rect.y + rect.height },
+	});
+};
+
 // 点击关闭标签页
 const handleTabCloseClicked = (serverId: string, event: MouseEvent) => {
 	appStore.removeServer(serverId);
@@ -72,6 +105,7 @@ const handleTabCloseClicked = (serverId: string, event: MouseEvent) => {
 					:key="server.data.id"
 					class="tabWrapper"
 					@click="handleTabClicked(server.data.id)"
+					@contextmenu="handleTabContextMenu($event, server)"
 				>
 					<div class="tab" :class="appStore.currentServerId === server.data.id ? 'selected' : 'unselected'">
 						<div class="progress progress-green" :style="{...serverStyle[server.data.id].colorStyle, opacity: serverStyle[server.data.id].status === 'running' ? 1 : 0}" />

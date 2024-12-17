@@ -51,7 +51,7 @@
   },
   "dependencies": {
     "@khanacademy/simple-markdown": "^0.11.2",
-    "conf": "^13.0.1",
+    "conf": "10.2.0",
     "crypto-js": "^4.1.1",
     "events": "^3.3.0",
     "koa": "^2.14.1",

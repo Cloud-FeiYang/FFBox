@@ -7,6 +7,7 @@ import { spawn, ChildProcess } from 'child_process';
 import EventEmitter from 'events';
 import { spawnInvoker } from '@common/spawnInvoker';
 import { selectString, replaceString, scanf, TypedEventEmitter } from '@common/utils';
+import { log } from './utils';
 import osBridge from './osBridge';
 
 interface InputInfoString {
@@ -49,7 +50,7 @@ export class FFmpeg extends (EventEmitter as new () => TypedEventEmitter<FFmpegI
 	 */
 	constructor(path = 'ffmpeg', mode: 0 | 1 | 2 = 0, params?: Array<string>) {
 		super();
-		console.log('启动 ffmpeg：', (params || []).join(', '));
+		log.info('启动 ffmpeg：', (params || []).join(', '));
 		spawnInvoker(path, params, {
 			detached: false,
 			// shell: mode == 1 ? true : false,	// 使用命令行以获得“'ffmpeg' 不是内部或外部命令，也不是可运行的程序”这样的提示
@@ -61,7 +62,7 @@ export class FFmpeg extends (EventEmitter as new () => TypedEventEmitter<FFmpegI
 				this.mountSpawnEvents();
 			})
 			.catch((reason) => {
-				console.error(reason);
+				log.error(reason);
 				this.emit('version', {});
 			});
 		this.process = null;

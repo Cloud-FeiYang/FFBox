@@ -275,7 +275,7 @@ const nodeBridge = {
 
 	localConfig: {
 		get(key: string) { return window.jsb?.ipcRenderer?.invoke('localConfig', 'get', key) },
-		set(key: string, value: string) { return window.jsb?.ipcRenderer?.invoke('localConfig', 'set', key, value) },
+		set(key: string, value: any) { return window.jsb?.ipcRenderer?.invoke('localConfig', 'set', key, value) },
 		delete(key: string) { return window.jsb?.ipcRenderer?.invoke('localConfig', 'delete', key) },
 	},
 }

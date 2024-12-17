@@ -8,6 +8,7 @@ import showMenu, { MenuItem } from '@renderer/components/Menu/Menu';
 import nodeBridge from '@renderer/bridges/nodeBridge';
 import { showEnvironmentInfo } from '@renderer/components/misc/EnvironmentInfo'
 import { showAddTaskPrompt, showOpenFilePrompt } from '@renderer/components/misc/AddTasks';
+import { showServerConfig } from '@renderer/components/misc/ServerConfig';
 import SponsorPanel from './MenuCenter/SponsorPanel.vue';
 import LocalSettings from './MenuCenter/LocalSettings.vue';
 import Terms from './MenuCenter/Terms.vue';
@@ -76,6 +77,10 @@ const finalMenu = computed(() => {
 					// entity.updateTaskList();
 					appStore.updateNotifications(server);
 				} },
+				...(appStore.currentServer?.entity.ip === 'localhost' ? [
+					{ type: 'separator' as any },
+					{ type: 'normal' as any, label: '本地服务器配置', value: '本地服务器配置', disabled: appStore.currentServer?.entity.status !== ServiceBridgeStatus.Connected, onClick: () => showServerConfig(appStore.currentServer.data.id) },
+				] : []),
 			],
 		},
 		{
@@ -329,7 +334,7 @@ const handleMenuItemClicked = (event: Event, value: any) => {
 	}
 	const correspondingMenuItem = dfs(finalMenu.value);
 	// 若找到该项，该项配置了 onClick，则触发
-	if (correspondingMenuItem && 'onClick' in correspondingMenuItem.item) {
+	if (correspondingMenuItem && 'onClick' in correspondingMenuItem.item && !correspondingMenuItem.item.disabled) {
 		const ret = correspondingMenuItem.item.onClick(event, value);
 		if (ret === true) {
 			appStore.showMenuCenter = 0;

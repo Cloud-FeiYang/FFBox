@@ -465,10 +465,10 @@ export function getTimeString(date: Date, showMs = true): string {
 }
 
 export function logMsg(...content: any[]): void {
-	console.log(getTimeString(new Date()), ...content);
+	console.log(`\x1b[32m${getTimeString(new Date())}\x1b[0m`, ...content);
 }
 logMsg.error = function (...content: any[]) {
-	console.error(getTimeString(new Date()), ...content);
+	console.error(`\x1b[31m${getTimeString(new Date())}\x1b[0m`, ...content);
 }
 
 /**

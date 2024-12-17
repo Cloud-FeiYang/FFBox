@@ -11,8 +11,8 @@ import os from 'os';
 import path from 'path';
 import { FFBoxServiceEventApi, FFBoxServiceEventParam, FFBoxServiceFunctionApi } from '@common/types';
 import { version } from '@common/constants';
-import { logMsg } from '@common/utils';
-import { getOs } from './utils';
+import { getSingleArgvValue } from '@common/utils';
+import { getOs, log } from './utils';
 import { FFBoxService } from './FFBoxService';
 
 // let koaBody = require('koa-body');
@@ -25,12 +25,6 @@ let ffboxService: FFBoxService | null;
 
 const uploadDir = os.tmpdir() + '/FFBoxUploadCache'; // 文件上传目录
 const downloadDir = os.tmpdir() + '/FFBoxDownloadCache'; // 文件下载目录
-
-function logDev(...content: any) {
-	if (isDev) {
-		logMsg(...content);
-	}
-}
 
 const uiBridge = {
 	init(self: FFBoxService): void {
@@ -47,7 +41,7 @@ const uiBridge = {
 		});
 		Promise.all([uploadDirCheck, downloadDirCheck]).then((values) => {
 			if (!values.every((value) => value)) {
-				logMsg('创建缓存文件夹', uploadDir, downloadDir);
+				log.info('创建缓存文件夹', uploadDir, downloadDir);
 				fs.mkdir(uploadDir, () => {});
 				fs.mkdir(downloadDir, () => {});
 			}
@@ -66,7 +60,7 @@ const uiBridge = {
 
 		// 初始化响应头和响应码
 		koa.use(async (ctx, next) => {
-			logDev('收到请求。', ctx.request.url);
+			log.dev('收到请求。', ctx.request.url);
 			ctx.response.set('Access-Control-Allow-Origin', '*');
 			ctx.response.set('Access-Control-Allow-Headers', 'Content-Type');
 			ctx.response.set('Access-Control-Allow-Methods', 'GET, POST, PUT');
@@ -108,19 +102,20 @@ const uiBridge = {
 		// wss = new (WebSocket.Server || WebSocketServer)({ server }); // https://github.com/websockets/ws/issues/1538
 		wss = new WebSocket.Server({ server });
 
-		server.listen(33269);
-		logMsg('Websocket 开始监听端口 33269。');
+		const port = +(getSingleArgvValue('--port') || 33269);
+		server.listen(port);
+		log.info(`Websocket 开始监听端口 ${port}。`);
 
 		// 挂载 WebSocket 服务器相关事件
 		wss.on('connection', mountWebSocketEvents);
 		wss.on('error', function (error: Error) {
-			logMsg.error('Websocket 服务出错，建议检查防火墙。', error);
+			log.error('Websocket 服务出错，建议检查防火墙。', error);
 			ffboxService!.emit('serverError', { error });
 			wss = null;
 		});
 		wss.on('close', function () {
 			ffboxService!.emit('serverClose');
-			logMsg('Websocket 服务关闭。');
+			log.info('Websocket 服务关闭。');
 			wss = null;
 		});
 		setTimeout(() => {
@@ -139,7 +134,7 @@ const uiBridge = {
  */
 function mountWebSocketEvents(ws: WebSocket, request: Http.IncomingMessage): void {
 	const address = request.socket.remoteAddress;
-	logMsg(`新客户端接入：${address}。`);
+	log.info(`新客户端接入：${address}。`);
 
 	ws.on('message', function (message: Buffer, isBinary: boolean): void {
 		// console.log('uiBridge: 收到来自客户端的消息', message);
@@ -149,15 +144,15 @@ function mountWebSocketEvents(ws: WebSocket, request: Http.IncomingMessage): voi
 	});
 
 	ws.on('close', function (code: number, reason: string) {
-		logMsg(`客户端连接关闭：${address}。`, code, reason);
+		log.info(`客户端连接关闭：${address}。`, code, reason);
 	});
 
 	ws.on('error', function (err: Error) {
-		logMsg.error(`客户端连接出错：${address}。`, err);
+		log.error(`客户端连接出错：${address}。`, err);
 	});
 
 	ws.on('open', function () {
-		logMsg(`客户端连接打开：${address}。`);
+		log.info(`客户端连接打开：${address}。`);
 	});
 }
 
@@ -170,7 +165,7 @@ function handleMessageFromClient(message: string): void {
 	}
 	const data: FFBoxServiceFunctionApi = JSON.parse(message);
 	const args = data.args;
-	logDev('收到调用：', data);
+	log.dev('收到调用：', data);
 	// @ts-ignore
 	ffboxService[data.function](...args.map((value) => (value === null ? undefined : value)));
 }
@@ -200,7 +195,7 @@ function mountEventFromService(): void {
 						event,
 						payload,
 					};
-					logDev('触发信息：', data);
+					log.dev('触发信息：', data);
 					// console.log('将要发送 ws 信息', event, event === 'taskUpdate' ? [(payload as any).content.after.input.files, (payload as any).content.paraArray.join(' ')] : undefined);
 					client.send(JSON.stringify(data));
 				}
@@ -259,7 +254,7 @@ function getRouter(): Router {
 			return;
 		}
 		// 暂定 body 里的属性只有一个 hashs: Array<string>，不写 ts 定义了
-		logMsg('检查文件缓存性', ctx.request.body.hashs);
+		log.info('检查文件缓存性', ctx.request.body.hashs);
 		const hashs = ctx.request.body.hashs as Array<string>;
 		const ret: Array<number> = [];
 		for (const hash of hashs) {
@@ -283,14 +278,14 @@ function getRouter(): Router {
 		}
 		const file = ctx.request.files.file /*as formidable.File*/ as any;
 		const body = ctx.request.body;
-		logMsg('收到文件', file.originalFilename);
+		log.info('收到文件', file.originalFilename);
 		const destPath = uploadDir + '/' + body.name;
 		try {
 			fs.renameSync(file.filepath, destPath);
-			logMsg('文件已缓存至', destPath);
+			log.info('文件已缓存至', destPath);
 			ctx.response.status = 200;
 		} catch (error) {
-			logMsg.error('文件重命名失败', error);
+			log.error('文件重命名失败', error);
 			ctx.response.status = 500;
 		}
 	});

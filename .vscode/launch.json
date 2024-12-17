@@ -19,6 +19,7 @@
       // },
       "program": "${workspaceFolder}/src/backend/index.ts",
       "outFiles": ["${workspaceFolder}/app/backend/**/*.cjs"],
+      "args": ["--loglevel", "6"],
       // "skipFiles": [
       //     "<node_internals>/**"
       // ],

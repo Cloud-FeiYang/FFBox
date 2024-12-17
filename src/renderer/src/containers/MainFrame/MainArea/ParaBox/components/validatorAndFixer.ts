@@ -25,3 +25,7 @@ export function framerateValidator(value: string) {
 export function durationFixer(value: string) {
     return value.replaceAll('：', ':').replaceAll('。', '.').replace(/[a-z]/g, '');
 }
+
+export function posIntegerFixer(value: string) {
+    return value.replace(/[^0-9]/g, '');
+}

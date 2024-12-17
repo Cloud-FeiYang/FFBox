@@ -120,6 +120,14 @@ export class ServiceBridge extends (EventEmitter as new () => TypedEventEmitter<
 
 	}
 
+	public initSettings() {
+		let data: FFBoxServiceFunctionApi = {
+			function: 'initSettings',
+			args: [],
+		}
+		this.sendWs(data);
+	}
+
 	public initFFmpeg() {
 		let data: FFBoxServiceFunctionApi = {
 			function: 'initFFmpeg',

@@ -1,6 +1,7 @@
 import type { FFmpeg } from '@backend/FFmpegInvoke';
 
 export interface FFBoxServiceInterface {
+	initSettings(): void;
 	initFFmpeg(): void;
 	emitFFmpegVersion(): void;
 	taskAdd(taskName: string, outputParams?: OutputParams): Promise<number>;
