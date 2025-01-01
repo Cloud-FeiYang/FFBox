@@ -591,7 +591,7 @@ defineExpose({
 					display: flex;
 					justify-content: center;
 					align-items: center;
-					/deep/ svg {
+					&>:deep(svg) {
 						width: 20px;
 						height: 20px;
 					}

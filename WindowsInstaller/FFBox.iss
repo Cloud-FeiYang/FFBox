@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "FFBox"
-#define MyAppVersion "4.2"
+#define MyAppVersion "4.3"
 #define MyAppPublisher "滔滔清风"
 #define MyAppURL "http://ttqf.tech"
 ; #define MyCopyright "版权所有"
@@ -11,7 +11,7 @@
 
 ; 安装包输出文件夹
 #define MySetupOutDir "./output"
-#define MySetupOutBaseFilename "Windows_x86-64_FFBox_4.2"
+#define MySetupOutBaseFilename "Windows_x86-64_FFBox_4.3"
 
 ; 安装包所用的资源文件夹
 #define MyResDir "./res"
@@ -21,7 +21,7 @@
 ; 点击 license 打开的网页连接
 #define MyAppLkLicenseURL 'http://ttqf.tech/LICENSE'
 ; 安装目录至少需要的空间
-#define MyAppNeedSpaceByte 280000000
+#define MyAppNeedSpaceByte 290000000
 ; 外部程序调用本安装程序时，会向外部传安装进度的 window api Message ID 
 #define WM_MY_INSTALL_PROGRESS 6364
 
@@ -51,7 +51,7 @@ DefaultDirName={pf}/{#MyAppName}
 LicenseFile={#MyAppPkgDir}\LICENSE
 OutputDir={#MySetupOutDir}
 OutputBaseFilename={#MySetupOutBaseFilename}
-SetupIconFile={#MyResDir}\256.ico
+SetupIconFile={#MyResDir}\..\..\config\256.ico
 ; ArchitecturesAllowed 指示安装包运行时检查系统的架构类型
 ArchitecturesAllowed=x64compatible
 ; ArchitecturesInstallIn64BitMode 指示安装包本体的架构类型

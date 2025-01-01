@@ -33,19 +33,19 @@ onMounted(() => {
 		box-sizing: border-box;
 		width: 100%;
 		padding: 0 5%;
-		/deep/ h1 {
+		:deep(h1) {
 			font-size: 22px;
 		}
-		/deep/ div {
+		:deep(di)v {
 			font-size: 15px;
 			line-height: 25px;
 			text-align: left;
 			margin: 10px 0;
 		}
-		/deep/ ul {
+		:deep(ul) {
 			margin: 10px 0;
 		}
-		/deep/ li {
+		:deep(li) {
 			font-size: 15px;
 			line-height: 25px;
 			text-align: left;

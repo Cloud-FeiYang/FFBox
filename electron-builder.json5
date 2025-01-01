@@ -21,7 +21,7 @@
   ],
   "win": {
     "artifactName": "${productName}_${version}.${ext}",
-    "icon": "256.png",
+    "icon": "config/256.ico",
     "target": [
       {
         "target": "dir",
@@ -41,7 +41,7 @@
   },
   "mac": {
     "artifactName": "${productName}_${version}.${ext}",
-    "icon": "512.png",
+    "icon": "config/512.png",
     "target": [
       {
         "target": "dmg",
@@ -57,7 +57,7 @@
   },
   "linux": {
     "artifactName": "${productName}_${version}.${ext}",
-    "icon": "256.icns",
+    "icon": "config/256.icns",
     "target": [
       {
         "target": "AppImage",
