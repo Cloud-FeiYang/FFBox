@@ -25,36 +25,50 @@ const handleDownloadClick = (os: 'Windows' | 'MacOS' | 'Linux' | 'web', selectio
 	switch (os) {
 		case 'Windows':
 			url = [
-				'https://github.com/ttqftech/FFBox/releases/download/v4.2/Windows_x86-64_FFBox_4.2.exe',
-				'https://github.com/ttqftech/FFBox/releases/download/v4.2/Windows_x86-64_FFBoxService_4.2.exe',
+				'https://github.com/ttqftech/FFBox/releases/download/v4.3/Windows_x86-64_FFBox_4.3.exe',
+				'https://github.com/ttqftech/FFBox/releases/download/v4.3/Windows_x86-64_FFBoxService_4.3.exe',
 			][selection];
 			window.open(url, '__blank');
 			break;
 		case 'MacOS':
 			url = [
-				'https://github.com/ttqftech/FFBox/releases/download/v4.2/macOS_ARM64_FFBox_4.2.dmg',
-				'https://github.com/ttqftech/FFBox/releases/download/v4.2/macOS_ARM64_FFBoxService_4.2',
+				'https://github.com/ttqftech/FFBox/releases/download/v4.3/macOS_ARM64_FFBox_4.3.dmg',
+				'https://github.com/ttqftech/FFBox/releases/download/v4.3/macOS_ARM64_FFBoxService_4.3',
 			][selection];
-			window.open(url, '__blank');
+			Msgbox({
+				image: h(IconPointOut),
+				title: 'macOS 使用须知',
+				content: h('div', [
+					'由于 macOS 应用的签名与公证要求 Apple 开发者账号，而 Apple 开发者账号要求启用账户的双重认证', h('br'),
+					'FFBox 开发者并未同意此要求，故无法对 FFBox 进行签名与公证', h('br'),
+					'这将会导致您在运行 FFBox 时提示“无法打开”或“已损坏”', h('br'),
+					'建议参考', h('a', { href: 'https://zhuanlan.zhihu.com/p/135948430', target: '_blank' }, '此文' ), '指示进行白名单处理', h('br'),
+					'另外，ffmpeg 官方下载站并未提供 ARM 架构的 ffmpeg 二进制文件', h('br'),
+					'如果您在使用 ARM 架构的 macOS，您可在 ', h('a', { href: 'http://www.osxexperts.net/', target: '_blank' }, 'OSXExperts' ), ' 等网站上另行下载 ffmpeg',
+				]),
+				buttons: [
+					{ text: `我已知悉，继续`, type: ButtonType.Primary, callback: () => window.open(url, '__blank') && true },
+				]
+			});
 			break;
 		case 'Linux':
 			url = [
-				'https://github.com/ttqftech/FFBox/releases/download/v4.2/Linux_x86-64_FFBox_4.2.deb',
-				'https://github.com/ttqftech/FFBox/releases/download/v4.2/Linux_x86-64_FFBox_4.2.AppImage',
-				'https://github.com/ttqftech/FFBox/releases/download/v4.2/Linux_x86-64_FFBoxService_4.2',
+				'https://github.com/ttqftech/FFBox/releases/download/v4.3/Linux_x86-64_FFBox_4.3.deb',
+				'https://github.com/ttqftech/FFBox/releases/download/v4.3/Linux_x86-64_FFBox_4.3.AppImage',
+				'https://github.com/ttqftech/FFBox/releases/download/v4.3/Linux_x86-64_FFBoxService_4.3',
 			][selection];
 			window.open(url, '__blank');
 			break;
 		case 'web':
 			url = [
 				'./online',
-				'./FFBox_v4.2_web.zip',
+				'./FFBox_v4.3_web.zip',
 			][selection];
 			if (selection === 0) {
 				Msgbox({
 					image: h(IconPointOut),
 					title: '您将要使用一个尚未完善的网页版～',
-					content: h('div', ['4.2 版本尚未对网页运行进行针对性优化，因此网页版只能用于体验功能，可能无法正常使用', h('br'), '同时，建议自行部署以获得更佳体验～']),
+					content: h('div', ['4.3 版本尚未对网页运行进行针对性优化，因此网页版只能用于体验功能，可能无法正常使用', h('br'), '同时，建议自行部署以获得更佳体验～']),
 					buttons: [
 						{ text: `我已知悉，继续`, type: ButtonType.Primary, callback: () => window.open(url, '__blank') && true },
 					]
