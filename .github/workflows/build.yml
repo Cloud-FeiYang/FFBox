@@ -30,6 +30,92 @@ jobs:
       run: npm run package # Adjust this if you have a specific packaging script
 
     - name: Archive the build
+      uses: actions/upload-artifact@v3
+      with:
+        name: FFBox-Windows
+        path: path/to/your/package # Adjust the path to your package
+    
+  release:
+    needs: build
+    runs-on: windows-latest
+    steps:
+    - name: Download build artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: FFBox-Windows
+        path: ./build
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Asset
+      uses: actions/upload-artifact@v3
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./build/path/to/your/package # Adjust the path to your package
+        asset_name: FFBox-Windows.zip # Adjust the name of your package
+        asset_content_type: application/zip
+Public code references from 2 repositories
+You can update your workflow file at .github/workflows/build.yml with this content to resolve the error.
+
+Code
+Pull requests
+Actions
+BreadcrumbsFFBox/.github/workflows
+/build.yml
+Latest commit
+Cloud-FeiYang
+Cloud-FeiYang
+2 minutes ago
+History
+67 lines (56 loc) · 1.69 KB
+File metadata and controls
+
+Code
+
+Blame
+name: Build and Release Windows Version
+
+on:
+  schedule:
+    # Every day
+    - cron:  "0 0 * * *"
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+   
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '16'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Build the project
+      run: npm run build
+
+    - name: Package the project
+      run: npm run package # Adjust this if you have a specific packaging script
+
+    - name: Archive the build
       uses: actions/upload-artifact@v2
       with:
         name: FFBox-Windows
