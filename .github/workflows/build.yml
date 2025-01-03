@@ -1,5 +1,4 @@
 name: Build and Release Windows Version
-
 on:
   schedule:
     # Every day
